@@ -97,3 +97,7 @@ dkms.conf
 # Local History for Visual Studio Code
 .history/
 
+_*
+
+test_client*
+
