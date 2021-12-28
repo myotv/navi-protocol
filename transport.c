@@ -314,7 +314,8 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
     return -1;
   }
 
-  //DEBUG_hexdump(buffer, res);
+  DEBUG_printf("signalling RX\n");
+  DEBUG_hexdump(buffer, res);
 
   if ((buffer[0]&0x80)!=0x80) {
     DEBUG_FAILURE(navi_ctx, "bad reply code %02x\n",buffer[0]);
@@ -342,6 +343,13 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
         return -1;
       }
       break;
+  }
+
+  if (decrypted_data) {
+    DEBUG_printf("signalling RX decrypted %d\n",decrypted_len);
+    DEBUG_hexdump(decrypted_data, decrypted_len);
+  } else {
+    DEBUG_printf("signalling RX decrypted NULL\n");
   }
 
   switch (buffer[0]&0x7f) {
@@ -403,11 +411,14 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
             DEBUG_printf("%p: add remote candidate %d %s '%s'\n",navi_ctx,candidate_list_version,gathering_done?"DONE":"",sdp?sdp:"NULL");
             if (sdp) {
               juice_add_remote_candidate(agent, sdp);
+              DEBUG_printf("%p: juice_add_remote_candidate\n",navi_ctx);
               navi_ctx->candidate_list_version|=(1<<candidate_list_version);
             }
             if (gathering_done) {
               juice_set_remote_gathering_done(agent);
+              DEBUG_printf("%p: juice_set_remote_gathering_done\n",navi_ctx);
             }
+            DEBUG_printf("%p: done add\n",navi_ctx);
           } else {
             DEBUG_FAILURE(navi_ctx, "Can't decode offer\n");
           }
@@ -632,7 +643,7 @@ void proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
               return;
             }
           }
-          pkt_fragment=malloc(sizeof(struct navi_rx_packet_fragment_s)+stream_ctx->desc.stream_mss);
+          pkt_fragment=malloc(sizeof(struct navi_rx_packet_fragment_s)+stream_ctx->desc.stream_mss+NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN));
           pkt_fragment->fec=fec_packet;
           pkt_fragment->head=src_fragment->head;
           if (i<rx_packet->fragment_count-1) {
@@ -640,16 +651,24 @@ void proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           } else {
             pkt_fragment->payload_len=rx_packet->packet_size%stream_ctx->desc.stream_mss;
           }
+          memset(pkt_fragment->data, 0, stream_ctx->desc.stream_mss+NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN));
+          
         }
       }
-      // try to recover from fec
-    } else {
+      lost_packets=0;
+    } 
+    if (!lost_packets) {
       struct navi_received_frame_s *rx_frame=malloc(sizeof(struct navi_received_frame_s)+rx_packet->packet_size);
       uint8_t *rx_packet_data=rx_frame->data.data;
       uint32_t ptr=0;
       int decrypt_error=0;
       for (int i=0; i<rx_packet->fragment_count; ++i) {
         struct navi_rx_packet_fragment_s *pkt=rx_packet->fragments[i];
+        if (!pkt) {
+          DEBUG_FAILURE(navi_ctx,"No packet fragment at %d\n",i);
+          ++decrypt_error;
+          break;
+        }
         if (pkt->head.flags&NAVI_DATA_FLAG_ENCRYPTED_DATA) {
           int decrypted_len;
           uint8_t *decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, pkt->data, pkt->data_len, &decrypted_len);
@@ -664,6 +683,7 @@ void proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           }
         } else {
           if (pkt->head.flags&NAVI_DATA_FLAG_DEBUG_DATA_PATH) {
+            DEBUG_printf("frag %d ptr %u\n",i,ptr);
             DEBUG_hexdump(&pkt->data[NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN)], MIN(32,pkt->payload_len));
           }
           memcpy(&rx_packet_data[ptr], &pkt->data[NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN)], pkt->payload_len);
@@ -696,6 +716,28 @@ void proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           rx_frame->next=NULL;
           stream_ctx->rx_done_queue=rx_frame;
         }
+
+        #ifdef DEBUG_DATA_PACKETS
+        if (rx_packet->debug_data) {
+          struct NaviProtocolStreamDebug *debug_data=(struct NaviProtocolStreamDebug *)rx_packet->debug_data;
+          int dbg_data_len=be32toh(debug_data->data_len);
+          uint32_t dbg_data_crc=be32toh(debug_data->data_crc);
+          DEBUG_printf("rx debug packet %p\n",rx_packet->debug_data);
+          DEBUG_hexdump(rx_packet->debug_data, rx_packet->debug_data_len);
+          DEBUG_printf("rx data len %u crc %08x\n",dbg_data_len,dbg_data_crc);
+          if (dbg_data_len!=rx_frame->data.data_len) {
+            DEBUG_printf("rx frame length missmatch: rx %d dbg %d\n",rx_frame->data.data_len,dbg_data_len);
+          } else {
+            uint32_t rx_crc=crc32(rx_frame->data.data, 0xFFFFFFFF, dbg_data_len);
+            if (rx_crc!=dbg_data_crc) {
+              DEBUG_printf("rx frame bad crc: calc %08x dbg %08x\n",rx_crc, dbg_data_crc);
+            } else {
+              DEBUG_printf("\nDBG stream %08x frame %d data len %d crc %08x\n",stream_ctx->stream_id,rx_packet->packet_id,rx_frame->data.data_len,rx_crc);
+            }
+          }
+        }
+        #endif
+
         pthread_cond_signal(&stream_ctx->rx_cond);
         pthread_mutex_unlock(&stream_ctx->rx_mtx);
 
@@ -725,6 +767,7 @@ void proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
         }
         stream_ctx->rx_queue[stream_ctx->desc.rx_queue_length-1]=NULL;
         ++stream_ctx->rx_queue_head;
+        free(rx_packet->debug_data);
         free(rx_packet);
         DEBUG_printf("-- now qhead %u\n",stream_ctx->rx_queue_head);
       }
@@ -742,6 +785,7 @@ void proced_rx_queue(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ct
     DEBUG_printf("-- proced rx queue %d %p id %u done %d\n",i,rx_packet,rx_packet->packet_id,rx_packet->done);
 
     if (rx_packet->done && final_check) {
+      free(rx_packet->debug_data);
       free(rx_packet);
       stream_ctx->rx_queue[i]=NULL;
       continue;
@@ -755,6 +799,7 @@ void proced_rx_queue(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ct
       }
       free(rx_packet->fragments);
       free_fragment_queue(&rx_packet->fec_packets);
+      free(rx_packet->debug_data);
       free(rx_packet);
       stream_ctx->rx_queue[i]=NULL;
     }
@@ -780,18 +825,27 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
   rx_packet_id=be32toh(fragment_head->frame_id);
   fragment_idx=be16toh(fragment_head->frame_idx);
 
-  DEBUG_printf("-- rx to stream %p id %u frame idx %d/%d size %d frag size %d flags %d\n",stream_ctx,rx_packet_id,fragment_idx,be16toh(fragment_head->frame_count),be32toh(fragment_head->frame_size),payload_len,fragment_head->flags);
+  DEBUG_printf("-- rx to stream %p id %u frame idx %d/%d size %d frag size %d flags %x\n",stream_ctx,rx_packet_id,fragment_idx,be16toh(fragment_head->frame_count),be32toh(fragment_head->frame_size),payload_len,fragment_head->flags);
+
+  DEBUG_hexdump(fragment_head, sizeof(struct NaviProtocolDataFrameHeader));
 
   if (rx_packet_id<stream_ctx->rx_queue_head) {
     DEBUG_FAILURE(navi_ctx, "rx packet id %08x less than head %08x\n",rx_packet_id,stream_ctx->rx_queue_head);
     return;
   }
 
-  DEBUG_printf("-- rx_packet_id %u rx_queue_head %u length %d\n",rx_packet_id,stream_ctx->rx_queue_head,stream_ctx->desc.rx_queue_length);
+  DEBUG_printf("-- rx_packet_id %u rx_queue_head %u length %d flags %02x\n",rx_packet_id,stream_ctx->rx_queue_head,stream_ctx->desc.rx_queue_length,fragment_head->flags);
 
   if (fragment_head->flags&NAVI_DATA_FLAG_DEBUG_DATA_PATH) {
     DEBUG_hexdump(head->payload,MIN(80,payload_len));
   }
+
+#ifndef DEBUG_DATA_PACKETS
+  if (fragment_head->flags&=NAVI_DATA_FLAG_DEBUG_DATA) {
+    // ignore debug packet
+    return;
+  }
+#endif
 
   // frame out of order
   if (rx_packet_id>=(stream_ctx->rx_queue_head+stream_ctx->desc.rx_queue_length)) {
@@ -806,10 +860,25 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
     rx_packet=(struct navi_rx_packet_s *)malloc(sizeof(struct navi_rx_packet_s));
     rx_packet->packet_id=rx_packet_id;
     rx_packet->done=0;
+    #ifdef DEBUG_DATA_PACKETS
+    if (!(fragment_head->flags&NAVI_DATA_FLAG_DEBUG_DATA)) {
+      rx_packet->packet_size=be32toh(fragment_head->frame_size);
+      rx_packet->fragment_count=be16toh(fragment_head->frame_count);
+      rx_packet->fragments=malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+      memset(rx_packet->fragments, 0, sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+    } else {
+      rx_packet->packet_size=0;
+      rx_packet->fragment_count=0;
+      rx_packet->fragments=NULL;
+    }
+    #else
     rx_packet->packet_size=be32toh(fragment_head->frame_size);
     rx_packet->fragment_count=be16toh(fragment_head->frame_count);
     rx_packet->fragments=malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
     memset(rx_packet->fragments, 0, sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+    #endif
+    rx_packet->debug_data=NULL;
+    rx_packet->debug_data_len=0;
     rx_packet->fec_packets=NULL;
     stream_ctx->rx_queue[rx_packet_id-stream_ctx->rx_queue_head]=rx_packet;
     DEBUG_printf("-- new rx packet %p\n",rx_packet);
@@ -818,6 +887,23 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
       return; // duplicate packet
     }
   }
+
+#ifdef DEBUG_DATA_PACKETS
+  if (fragment_head->flags&NAVI_DATA_FLAG_DEBUG_DATA) {
+    DEBUG_printf("** update debug info pkt %d\n",rx_packet_id);
+    DEBUG_hexdump(head->payload, payload_len);
+    free(rx_packet->debug_data);
+    rx_packet->debug_data=navi_decrypt_with_dh_secret(navi_ctx, head->payload, payload_len, &rx_packet->debug_data_len);
+    return;
+  } else 
+  if (rx_packet->packet_size==0 && rx_packet->fragment_count==0) {
+    rx_packet->packet_size=be32toh(fragment_head->frame_size);
+    rx_packet->fragment_count=be16toh(fragment_head->frame_count);
+    rx_packet->fragments=malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+    memset(rx_packet->fragments, 0, sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+    DEBUG_printf("-- update real packet info size %d frags %d\n",rx_packet->packet_size,rx_packet->fragment_count);
+  }
+#endif
 
   pkt_fragment=malloc(sizeof(struct navi_rx_packet_fragment_s)+payload_len);
   DEBUG_printf("*** fragment %p idx %d len %d\n",pkt_fragment,fragment_idx,payload_len); fflush(stdout);
@@ -854,7 +940,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
     DEBUG_FAILURE(navi_ctx,"fragment not processed\n");
   }
 
-  proced_rx_queue_packet(navi_ctx, stream_ctx, 0, rx_packet);
+  if (rx_packet->packet_size) proced_rx_queue_packet(navi_ctx, stream_ctx, 0, rx_packet);
 }
 
 static
@@ -891,25 +977,35 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
       DEBUG_printf("%p: start frame, state %d\n",navi_ctx,navi_get_protocol_state(navi_ctx));
       //DEBUG_hexdump(start, payload_len);
 
-      if (!navi_wait_for_state(navi_ctx, NAVI_STATE_DH_SEND, 1500)) {
-        DEBUG_FAILURE(navi_ctx,"bad state for START frame\n");
-        return;
-      }
-
-      if (payload_len!=(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len)) {
-        DEBUG_FAILURE(navi_ctx,"bad start payload length %d!=%ld\n",payload_len,(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len));
-        return;
-      }
       if (memcmp(start->domain, navi_ctx->domain_hash, sizeof(navi_ctx->domain_hash))) {
         DEBUG_FAILURE(navi_ctx,"bad domain\n");
         return;
       }
+
+      void *remote_start_pkey=malloc(payload_len);
+      void *ptr_to_free;
+      memcpy(remote_start_pkey, head->payload, payload_len);
+      NAVI_LOCK_CTX(navi_ctx);
+      ptr_to_free=navi_ctx->remote_start_pkey;
+      navi_ctx->remote_start_pkey=remote_start_pkey;
+      navi_ctx->remote_start_pkey_len=payload_len;
+      NAVI_UNLOCK_CTX(navi_ctx);
+      free(ptr_to_free);
+
+      /*
+      if (payload_len!=(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len)) {
+        DEBUG_FAILURE(navi_ctx,"bad start payload length %d!=%ld\n",payload_len,(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len));
+        return;
+      }
+      */
       // openssl can't work good in multithred environment 
       // so copy public key and proced it in main thread
+      /*
       NAVI_LOCK_CTX(navi_ctx);
       memcpy(navi_ctx->remote_pkey_data, start->public_key, navi_ctx->local_pkey_len);
       navi_set_protocol_state(navi_ctx, NAVI_STATE_DH_RECEIVED, 0);
       NAVI_UNLOCK_CTX(navi_ctx);
+      */
     }
   } else 
   if (head->frameType==NAVICMD_STREAMS) {
@@ -930,13 +1026,13 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
     DEBUG_printf("data frame stream %08x\n",head->streamId);
     if (payload_len>0) {
       int data_len;
-      void *data=navi_decrypt_with_dh_secret(navi_ctx, head->payload, sizeof(struct NaviProtocolDataFrameHeader)+NAVI_AES128_TAIL_LEN, &data_len);
-      if (data && data_len>=sizeof(struct NaviProtocolDataFrameHeader)) {
-        proced_rx_fragment(navi_ctx, head, (struct NaviProtocolDataFrameHeader*)data);
+      void *decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, head->payload, sizeof(struct NaviProtocolDataFrameHeader)+NAVI_AES128_TAIL_LEN, &data_len);
+      if (decrypted_data && data_len>=sizeof(struct NaviProtocolDataFrameHeader)) {
+        proced_rx_fragment(navi_ctx, head, (struct NaviProtocolDataFrameHeader*)decrypted_data);
       } else {
-        DEBUG_FAILURE(navi_ctx,"Can't decrypt frame fragment header %p %d\n",data,data_len);
+        DEBUG_FAILURE(navi_ctx,"Can't decrypt frame fragment header %p %d\n",decrypted_data,data_len);
       }
-      free(data);
+      free(decrypted_data);
     }
   }
 }
@@ -1138,6 +1234,9 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
     return -1;
   }
 
+  DEBUG_printf("\nsend offer\n");
+  DEBUG_hexdump(answer_payload, answer_len);
+
   encrypted_data=navi_encrypt_with_secret(navi_ctx, answer_payload, answer_len, &encrypted_len);
   if (!encrypted_data) {
     DEBUG_FAILURE(navi_ctx, "Can't encrypt offer\n");
@@ -1166,7 +1265,11 @@ static
 int navi_transport_work_ICE(struct navi_protocol_ctx_s *navi_ctx) {
   juice_agent_t *agent=navi_ctx->ice_agent;
 
+  DEBUG_printf("navi_transport_work_ICE: ice_agent_state (start) %d\n",navi_ctx->ice_agent_state);
+
   signalling_check(navi_ctx);
+
+  DEBUG_printf("navi_transport_work_ICE: ice_agent_state (check) %d\n",navi_ctx->ice_agent_state);
 
   if (navi_ctx->ice_agent_state>=JUICE_STATE_CONNECTED) {
     navi_set_protocol_state(navi_ctx, NAVI_STATE_DH_GENERATE, 1);
@@ -1182,7 +1285,30 @@ int navi_transport_work_DH_SEND(struct navi_protocol_ctx_s *navi_ctx) {
   memcpy(start->domain, navi_ctx->domain_hash, sizeof(navi_ctx->domain_hash));
   memcpy(start->public_key, navi_ctx->local_pkey_data, navi_ctx->local_pkey_len);
   DEBUG_printf("%p: --- send DH\n",navi_ctx);
-  return navi_send_frame(navi_ctx, NAVICMD_START, NAVI_INFO_STREAM, start, start_len);
+  int res=navi_send_frame(navi_ctx, NAVICMD_START, NAVI_INFO_STREAM, start, start_len);
+  
+  void *remote_start_pkey;
+  int remote_start_pkey_len;
+  
+  NAVI_LOCK_CTX(navi_ctx);
+  remote_start_pkey=navi_ctx->remote_start_pkey;
+  remote_start_pkey_len=navi_ctx->remote_start_pkey_len;
+  navi_ctx->remote_start_pkey=NULL;
+  NAVI_UNLOCK_CTX(navi_ctx);
+
+  if (!remote_start_pkey) return res;
+
+  if (remote_start_pkey_len!=(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len)) {
+    DEBUG_FAILURE(navi_ctx,"bad start payload length %d!=%ld\n",remote_start_pkey_len,(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len));
+  } else {
+    struct NaviProtocolStartFrame *start=(struct NaviProtocolStartFrame *)remote_start_pkey;
+    memcpy(navi_ctx->remote_pkey_data, start->public_key, navi_ctx->local_pkey_len);
+    navi_set_protocol_state(navi_ctx, NAVI_STATE_DH_RECEIVED, 0);
+  }
+
+  free(remote_start_pkey);  
+
+  return res;
 }
 
 static 
@@ -1357,8 +1483,10 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
   int fec_packet_counter=0;
   uint16_t frame_idx=0;
   uint16_t fec_id_divisor=stream_ctx->desc.fec_level+1;
-  
   const uint8_t *data_ptr=(const uint8_t *)packet_data;
+
+  if (packet_size<0 || !packet_data) return -1;
+
   head=(struct NaviProtocolDataFrameHeader *)data;
 
   DEBUG_printf("\n\n***** send packet to %08x size %d pts %ld dts %ld id %u\n\n",stream_ctx->stream_id,packet_size,pts,dts,stream_ctx->packet_id+1);
@@ -1378,6 +1506,44 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
   head->frame_count=htobe16((packet_size/navi_ctx->mss)+((packet_size%navi_ctx->mss)>0));
 
   payload=data+sizeof(struct NaviProtocolDataFrameHeader);
+
+#ifdef DEBUG_DATA_PACKETS
+  {
+    struct NaviProtocolStreamDebug debug_packet;
+    void *debug_data=NULL;
+    int debug_data_len;
+    memcpy(&debug_packet.head, head, sizeof(struct NaviProtocolDataFrameHeader));
+    debug_packet.head.flags=NAVI_DATA_FLAG_DEBUG_DATA;
+    debug_packet.head.frame_size=htobe32(sizeof(struct NaviProtocolStreamDebug)-sizeof(struct NaviProtocolDataFrameHeader));
+    debug_packet.data_len=htobe32(packet_size);
+    debug_packet.data_crc=htobe32(crc32(packet_data, 0xFFFFFFFF, packet_size));
+    DEBUG_printf("\nDBG stream %08x frame %d data len %d crc %08x\n",stream_ctx->stream_id,stream_ctx->packet_id,packet_size,be32toh(debug_packet.data_crc));
+    if (stream_ctx->desc.encryption==NAVI_ENCRYPT_NONE) {
+      debug_data=&debug_packet;
+      debug_data_len=sizeof(debug_packet);
+    } else {
+      debug_packet.head.flags|=NAVI_DATA_FLAG_ENCRYPTED_DATA;
+      if (!navi_encrypt_with_dh_secret(navi_ctx, &debug_packet, sizeof(struct NaviProtocolStreamDebug), &debug_data_len, encrypted_data)) {
+        DEBUG_FAILURE(navi_ctx,"Can't encrypt debug data stream %p\n",stream_ctx);
+        return -1;
+      }
+      debug_data=encrypted_data;
+    }
+    if (!debug_data) {
+      DEBUG_FAILURE(navi_ctx,"Can't make debug data stream %p\n",stream_ctx);
+       return -1;
+    }
+    DEBUG_printf("** debug pakcte flags %02x\n",debug_packet.head.flags);
+    if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, debug_data, debug_data_len)<0) {
+      DEBUG_FAILURE(navi_ctx, "Can't send data debug frame\n");
+      return -1;
+    } else {
+      DEBUG_printf("** send debug packet\n");
+      DEBUG_hexdump(&debug_packet, sizeof(debug_packet));
+      DEBUG_hexdump(debug_data, debug_data_len);
+    }
+  }
+#endif
 
   if (stream_ctx->desc.fec_level && packet_size>navi_ctx->mss) {
     fec_data=alloca(navi_ctx->mss+32);
@@ -1404,6 +1570,11 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
     DEBUG_printf("-- send frame part %d/%d len %d enc %d:\n",be16toh(head->frame_idx),be16toh(head->frame_count),subframe_len,frame_encryption);
     //DEBUG_hexdump(head,sizeof(struct NaviProtocolDataFrameHeader));
 
+    if (flags&NAVI_DATA_FLAG_DEBUG_DATA_PATH) {
+      DEBUG_printf("frag %d ptr %lu\n",frame_idx,data_ptr-((uint8_t*)packet_data));
+      DEBUG_hexdump(data_ptr, MIN(32,subframe_len));
+    }
+
     switch (frame_encryption) {
       case NAVI_ENCRYPT_NONE:
         memcpy(payload, data_ptr, subframe_len);
@@ -1422,7 +1593,8 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
           return -1;
         }
         memcpy(encrypted_data+encrypted_len, data_ptr, subframe_len);
-        DEBUG_printf("------ len %d %lu\n",encrypted_len,sizeof(struct NaviProtocolDataFrameHeader));
+        DEBUG_printf("-- encrypt head len %d %lu\n",encrypted_len,sizeof(struct NaviProtocolDataFrameHeader));
+
         if (flags&NAVI_DATA_FLAG_DEBUG_DATA_PATH) {
           DEBUG_hexdump(encrypted_data,MIN(subframe_len+encrypted_len,64));
         }
@@ -1469,19 +1641,9 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
               return -1;
             }
             break;
+          // fec always encrypted
           case NAVI_ENCRYPT_KEYFRAME:
           case NAVI_ENCRYPT_DATAHEADER:
-            if (!navi_encrypt_with_dh_secret(navi_ctx, fec_head, sizeof(struct NaviProtocolDataFrameHeader), &encrypted_len, encrypted_data)) {
-              DEBUG_FAILURE(navi_ctx,"Can't encrypt fec header stream %p\n",stream_ctx);
-              return -1;
-            }
-            memcpy(encrypted_data+encrypted_len, fec_data, navi_ctx->mss-sizeof(struct NaviProtocolDataFrameHeader));
-
-            if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, encrypted_data, navi_ctx->mss-sizeof(struct NaviProtocolDataFrameHeader)+encrypted_len)<0) {
-              DEBUG_FAILURE(navi_ctx, "Can't send fec frame\n");
-              return -1;
-            }
-            break;
           case NAVI_ENCRYPT_ALL:
             if (!navi_encrypt_with_dh_secret(navi_ctx, fec_head, navi_ctx->mss, &encrypted_len, encrypted_data)) {
               DEBUG_FAILURE(navi_ctx,"Can't encrypt data header stream %p\n",stream_ctx);
