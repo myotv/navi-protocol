@@ -28,11 +28,18 @@ struct NaviProtocolDataFrameHeader {
 // internal flags
 #define NAVI_DATA_FLAG_FEC_FRAME 0x10
 #define NAVI_DATA_FLAG_ENCRYPTED_DATA 0x20
+#define NAVI_DATA_FLAG_DEBUG_DATA 0x40
   uint8_t flags;
   uint16_t frame_count;
   uint32_t frame_id;
   uint32_t frame_size;
   uint16_t frame_idx;
+} __attribute__((packed));
+
+struct NaviProtocolStreamDebug {
+  struct NaviProtocolDataFrameHeader head;
+  uint32_t data_len;
+  uint32_t data_crc;
 } __attribute__((packed));
 
 static inline
