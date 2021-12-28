@@ -338,7 +338,7 @@ void *navi_encrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *pa
   if (!res) res=malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->encryption_key, navi_ctx->local_iv, 1)) {
-    free(res);
+    if (!dst_buffer) free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->encrypt_ctx=NULL;
     DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
