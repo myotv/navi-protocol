@@ -2,6 +2,7 @@
 #define _LIBNAVI_H_
 
 #define WITH_DEBUG 1
+#define DEBUG_DATA_PACKETS 1
 
 #ifdef WITH_DEBUG
 #define DEBUG_IO_STREAM stdout
