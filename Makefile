@@ -14,6 +14,8 @@ test_client1: test_client1.o libnavi-test.a libjuice-static.a -lcrypto  -lpthrea
 
 test_client.o: test_client.c
 
+test_client1.o: test_client1.c
+
 libnavi.a: libnavi.o encryption.o utils.o transport.o tlv.o
 	$(LD) -flto -r $^ -o libnavi_all.o
 	ar crs $@ libnavi_all.o
@@ -23,6 +25,7 @@ libnavi-test.a: libnavi.o encryption.o utils.o transport.o tlv.o
 	ar crs $@ $^
 
 clean:
-	rm -f *.o *.a *.d test_client
+	rm -f *.o libnavi-test.a libnavi.a *.d test_client test_client1
 
 
+-include .localtests
