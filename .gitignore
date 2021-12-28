@@ -100,4 +100,5 @@ dkms.conf
 _*
 
 test_client*
+.localtests
 
