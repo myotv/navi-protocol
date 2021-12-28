@@ -20,6 +20,8 @@ struct navi_rx_packet_s {
   uint32_t packet_size;
   struct navi_rx_packet_fragment_s **fragments;
   struct navi_rx_packet_fragment_s *fec_packets;
+  void *debug_data;
+  int debug_data_len;
 };
 
 struct navi_received_frame_s {
@@ -61,6 +63,8 @@ struct navi_protocol_ctx_s {
   void *local_pkey_data;
   int local_pkey_len;
   void *remote_pkey_data;
+  void *remote_start_pkey;
+  int remote_start_pkey_len;
   uint8_t encryption_key[16]; // 16 - for aes128
   uint8_t local_iv[16]; // local iv for encryption
   uint8_t remote_iv[16]; // remote iv for decryption
