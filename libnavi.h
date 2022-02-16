@@ -11,17 +11,26 @@
   fprintf(DEBUG_IO_STREAM, format); \
   fflush(DEBUG_IO_STREAM); \
 } while (0)
+#define DEBUG_FAILURE_A(format...) do { \
+  fprintf(DEBUG_IO_STREAM, "fail at %s:%d ", __FILE__, __LINE__); \
+  fprintf(DEBUG_IO_STREAM, format); \
+  fflush(DEBUG_IO_STREAM); \
+} while (0)
 #define DEBUG_printf(format...) fprintf(DEBUG_IO_STREAM, format)
 #define DEBUG_hexdump(ptr, size) hexdump(ptr, size)
+#define DEBUG_code(flag) if (flag)
 #else
 #define DEBUG_FAILURE(ctx, format...)
+#define DEBUG_FAILURE_A(format...)
 #define DEBUG_printf(format...)
 #define DEBUG_hexdump(ptr, size)
+#define DEBUG_code(flag) if (0)
 #endif
 
 #define RIFFTAG(c1,c2,c3,c4) ((c1) | ((c2) << 8) | ((c3) << 16) | ((uint32_t)(c4) << 24))
 
 enum navi_protocol_state_e {
+  NAVI_STATE_NOREPORT=-1,
   NAVI_STATE_INIT=0,
   NAVI_STATE_ICE,
   NAVI_STATE_DH_GENERATE,
@@ -30,12 +39,15 @@ enum navi_protocol_state_e {
   NAVI_STATE_WAIT_START,
   NAVI_STATE_PROCED_STREAMS,
   NAVI_STATE_ONLINE,
+  NAVI_STATE_DISCONNECT,
+  NAVI_STATE_RECONNECT,
 };
 
 struct navi_protocol_ctx_s;
 struct navi_stream_ctx_s;
 
 struct navi_config_s {
+  int unicast_enable;
   char *domain_name;
   char *client_name;
   char *domain_secret;
@@ -44,6 +56,9 @@ struct navi_config_s {
   char *turn_servers;
   char *signalling_server;
   int signalling_port;
+  int multicast_enable;
+  char *multicast_secret;
+  char *multicast_tx_group;
 };
 
 struct navi_stream_desc_s {
@@ -80,6 +95,12 @@ struct navi_stream_desc_s {
   int stream_mss;
 };
 
+struct navi_protocol_stream_list_s {
+  struct navi_protocol_stream_list_s *next;
+  uint32_t stream_id;
+  struct navi_stream_desc_s desc;
+};
+
 struct navi_received_frame_data_s {
   int32_t stream_id;
   long stream_api_id;
@@ -92,9 +113,24 @@ struct navi_received_frame_data_s {
   uint8_t data[0];
 };
 
+struct navi_quality_s {
+  double local_tx_net_rate; // including heaedrs
+  double remote_rx_net_rate; // including headers
+  double local_codec_tx_rate; // just codec data
+  double remote_codec_rx_rate; // remote receive rate after all processing and fec
+  double remote_recover_rate; // remote fec recover rate
+  double remote_loss_pps; // remote loss packet rate
+  uint64_t remote_loss_count; // remote loss packet count
+  enum {
+    NAVI_ADV_NONE = 0,
+    NAVI_ADV_LOWER_RATE,
+    NAVI_ADV_GROW_RATE
+  } advisory;
+};
+
 struct navi_events_s {
   void *client_event_data;
-  void (*client_event)(struct navi_protocol_ctx_s *navi_ctx, const uint32_t hash, const char *name, const char *sdp, void *user_data);
+  void (*client_event)(struct navi_protocol_ctx_s *navi_ctx, const uint32_t hash, const char *domain, const char *name, const char *sdp, const uint8_t state, const int is_mcast, const int nstreams, struct navi_protocol_stream_list_s *streams, void *user_data);
   void *answer_event_data;
   int (*answer_event)(struct navi_protocol_ctx_s *navi_ctx, const uint32_t hash, const char *name, const char *sdp, void *user_data);
   void *rx_stream_event_data;
@@ -102,13 +138,21 @@ struct navi_events_s {
   // this event called in SOME thread, not in the main one
   void *rx_data_event_data;
   void (*rx_data_event)(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream, const int64_t pts, const int64_t dts, const int flags, void *user_data);
+  void *quality_event_data;
+  void (*quality_event)(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream, const struct navi_quality_s *quality, void *user_data);
+  void *state_event_data;
+  void (*state_event)(struct navi_protocol_ctx_s *navi_ctx, void *user_data);
 };
+
+typedef uint64_t (*navi_timesource_func)(void *user_data);
 
 struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, struct navi_events_s *events);
 void navi_free_context(struct navi_protocol_ctx_s *navi_ctx);
 struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_desc_s *stream_desc);
 
 enum navi_protocol_state_e navi_protocol_state(struct navi_protocol_ctx_s *navi_ctx);
+
+void navi_register_timesource(struct navi_protocol_ctx_s *navi_ctx, navi_timesource_func timesource_func, void *user_data);
 
 // these flags are allowed for user
 #define NAVI_DATA_FLAG_KEYFRAME 0x01
@@ -135,8 +179,19 @@ int navi_wait_protocol_frame(struct navi_protocol_ctx_s *navi_ctx, const int tim
 int navi_wait_stream_frame(struct navi_stream_ctx_s *stream_ctx, const int timeout);
 
 long navi_get_stream_api_id(struct navi_stream_ctx_s *stream_ctx);
+uint32_t navi_get_stream_id(struct navi_stream_ctx_s *stream_ctx);
 void navi_set_stream_api_id(struct navi_stream_ctx_s *stream_ctx, const long id);
 
 uint32_t navi_crc32(const void *buffer, const uint32_t start, const size_t len);
+
+void navi_get_stream_counters(struct navi_stream_ctx_s *stream_ctx, void (*receiver)(struct navi_stream_ctx_s *stream_ctx, void *user_data, ...), void *user_data, const uint64_t dt_now_ms);
+void navi_get_stream_remote_counters(struct navi_stream_ctx_s *stream_ctx, void (*receiver)(struct navi_stream_ctx_s *stream_ctx, void *user_data, ...), void *user_data);
+
+void navi_transport_set_discovery_group(const char *group_addr);
+int navi_transport_set_multicast_discovery(const int enable);
+int navi_transport_start_multicast(struct navi_protocol_ctx_s *navi_ctx);
+int navi_transport_stop_multicast(struct navi_protocol_ctx_s *navi_ctx);
+
+int navi_transport_multicast_ready(struct navi_protocol_ctx_s *navi_ctx);
 
 #endif

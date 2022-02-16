@@ -1,11 +1,18 @@
 #ifndef _NAVI_PROTOCOL_H_
 #define _NAVI_PROTOCOL_H_
 
-#define NAVICMD_START (htobe16(0x4e53))
-#define NAVICMD_STREAMS (htobe16(0x4e41))
-#define NAVICMD_DATA (htobe16(0x4e44))
+#define NAVICMD_START (htobe16(0x4e53)) // 'NS'
+#define NAVICMD_STREAMS (htobe16(0x4e41)) // 'NA'
+#define NAVICMD_DATA (htobe16(0x4e44))  // 'ND'
+#define NAVICMD_STATS (htobe16(0x4e49)) // 'NI'
 
 #define NAVI_INFO_STREAM 0x4e415649
+
+#define NAVI_SIGNALLING_STATE_READY 0
+#define NAVI_SIGNALLING_STATE_BUSY 1
+#define NAVI_SIGNALLING_STATE_RECONNECT 2
+
+#define NAVI_MULTICAST_DISCOVERY_PORT 5000
 
 struct NaviProtocolFrameHeader {
   uint16_t frameType;
@@ -40,6 +47,16 @@ struct NaviProtocolStreamDebug {
   struct NaviProtocolDataFrameHeader head;
   uint32_t data_len;
   uint32_t data_crc;
+} __attribute__((packed));
+
+struct NaviProtocolStatisticElement {
+#define NAVI_STAT_FLAG_DOUBLE 1
+#define NAVI_STAT_FLAG_INTEGER 2
+#define NAVI_STAT_FLAG_TYPE_MASK 3
+#define NAVI_STAT_FLAG_GAUGE 4
+  uint8_t flags;
+  uint16_t hash;
+  uint64_t value;
 } __attribute__((packed));
 
 static inline

@@ -11,7 +11,12 @@ void *navi_decrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
 int navi_generate_keys(struct navi_protocol_ctx_s *navi_ctx);
 int navi_generate_secret(struct navi_protocol_ctx_s *navi_ctx);
 
+int navi_generate_mcast_secret(struct navi_protocol_ctx_s *navi_ctx);
+
 void *navi_encrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *payload, const int payload_len, int *encrypted_len, void *dst_buffer);
 void *navi_decrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *payload, const int payload_len, int *decrypted_len);
+
+void *navi_encrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void *payload, const int payload_len, int *encrypted_len, void *dst_buffer);
+void *navi_decrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void *payload, const int payload_len, int *decrypted_len);
 
 #endif
