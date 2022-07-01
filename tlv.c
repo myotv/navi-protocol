@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <endian.h>
 #include <alloca.h>
