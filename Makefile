@@ -1,10 +1,15 @@
 CC=gcc-6
 
 .SUFFIXES: .c .o .cpp .h
+.PHONY: all clean
 
 CFLAGS=-MMD -O3 -march=broadwell  -funsigned-char -g -std=c11 -D_FILE_OFFSET_BITS=64 -Werror -D_GNU_SOURCE -fvisibility=hidden
 
-all: test_client test_client1 test_client2 libnavi.a libnavi-test.a
+TESTS=
+
+#test_client test_client1 test_client2
+
+all: libnavi.a libnavi-test.a tests
 
 -include $(wildcard *.d)
 
@@ -33,3 +38,5 @@ clean:
 
 
 -include .localtests
+
+tests: $(TESTS)
