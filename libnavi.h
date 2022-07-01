@@ -1,9 +1,9 @@
 #ifndef _LIBNAVI_H_
 #define _LIBNAVI_H_
 
-#define WITH_DEBUG 1
-#define DEBUG_DATA_PACKETS 1
+#include "navi-config.h"
 
+// these macros for debugging development library, must be removed in production build
 #ifdef WITH_DEBUG
 #define DEBUG_IO_STREAM stdout
 #define DEBUG_FAILURE(ctx, format...) do { \
@@ -26,6 +26,21 @@
 #define DEBUG_hexdump(ptr, size)
 #define DEBUG_code(flag) if (0)
 #endif
+
+enum navi_loglevel_e {
+  LL_NAVI_NONE=0,
+  LL_NAVI_CRITICAL,
+  LL_NAVI_ERROR,
+  LL_NAVI_INFO,
+  LL_NAVI_DEBUG,
+  LL_NAVI_TRACE
+};
+
+extern enum navi_loglevel_e navi_loglevel;
+
+#define NAVI_SIGNALLING_STATE_READY 0
+#define NAVI_SIGNALLING_STATE_BUSY 1
+#define NAVI_SIGNALLING_STATE_RECONNECT 2
 
 #define RIFFTAG(c1,c2,c3,c4) ((c1) | ((c2) << 8) | ((c3) << 16) | ((uint32_t)(c4) << 24))
 
@@ -146,6 +161,14 @@ struct navi_events_s {
 
 typedef uint64_t (*navi_timesource_func)(void *user_data);
 
+typedef int (*navi_logger_t)(const enum navi_loglevel_e level, 
+                             const struct navi_protocol_ctx_s *navi_ctx, 
+                             struct navi_stream_ctx_s *stream_ctx, 
+                             void *user_arg,
+                             const char *format, ...);
+
+void navi_library_init(void);
+
 struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, struct navi_events_s *events);
 void navi_free_context(struct navi_protocol_ctx_s *navi_ctx);
 struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_desc_s *stream_desc);
@@ -193,5 +216,19 @@ int navi_transport_start_multicast(struct navi_protocol_ctx_s *navi_ctx);
 int navi_transport_stop_multicast(struct navi_protocol_ctx_s *navi_ctx);
 
 int navi_transport_multicast_ready(struct navi_protocol_ctx_s *navi_ctx);
+
+navi_logger_t navi_set_logger(navi_logger_t func, void *user_arg);
+
+extern pthread_spinlock_t navi_logger_lock;
+extern navi_logger_t navi_logger_func;
+extern void *navi_logger_func_arg;
+
+#define NAVI_LOG(level, navi_ctx, stream_ctx, format...) do { \
+  pthread_spin_lock(&navi_logger_lock); \
+  navi_logger_t fn=navi_logger_func; \
+  void *arg=navi_logger_func_arg; \
+  pthread_spin_unlock(&navi_logger_lock); \
+  if (fn) fn(level, navi_ctx, stream_ctx, navi_logger_func_arg, format); \
+} while (0)
 
 #endif

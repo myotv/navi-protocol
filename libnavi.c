@@ -3,10 +3,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
+#include <pthread.h>
 #include <netinet/ip.h>
 
 #include <openssl/md5.h>
@@ -18,6 +20,14 @@
 #include "navi-protocol.h"
 #include "libnavi-internal.h"
 #include "perfcounters.h"
+
+enum navi_loglevel_e navi_loglevel=LL_NAVI_INFO;
+
+static int default_logger_func(const enum navi_loglevel_e navi_loglevel, const struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream_ctx, void *user_arg, const char *format, ...);
+
+pthread_spinlock_t navi_logger_lock;
+navi_logger_t navi_logger_func=default_logger_func;
+void *navi_logger_func_arg=NULL;
 
 static
 void calculate_hashes(struct navi_protocol_ctx_s *navi_ctx) {
@@ -355,3 +365,38 @@ void navi_get_stream_remote_counters(struct navi_stream_ctx_s *stream_ctx, void 
     0,NULL,-1 // tail
   );
 }
+
+static 
+int default_logger_func(const enum navi_loglevel_e loglevel, const struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream_ctx, void *user_arg, const char *format, ...) {
+  if (loglevel>navi_loglevel) return 0;
+  printf("NAVI:%p:%p|",navi_ctx,stream_ctx);
+  va_list ap;
+  va_start(ap, format);
+  const int res=vprintf(format, ap);
+  va_end(ap);
+  return res;
+}
+
+navi_logger_t navi_set_logger(navi_logger_t func, void *user_arg) {
+  pthread_spin_lock(&navi_logger_lock);
+  const navi_logger_t old_logger=navi_logger_func;
+  navi_logger_func=func;
+  navi_logger_func_arg=user_arg;
+  pthread_spin_unlock(&navi_logger_lock);
+  return old_logger;
+}
+
+#if NAVI_ALLOW_CONSTRUCTOR_INIT
+void __attribute__((constructor)) navi_library_init(void) 
+#else
+void navi_library_init(void)
+#endif
+{
+  static bool navi_is_initialized=false;
+  if (navi_is_initialized) return;
+  navi_is_initialized=true;
+
+  pthread_spin_init(&navi_logger_lock, PTHREAD_PROCESS_PRIVATE);
+}
+
+
