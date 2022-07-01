@@ -438,8 +438,10 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
     return -1;
   }
 
-  DEBUG_printf("signalling RX\n");
-  DEBUG_hexdump(buffer, res);
+//  DEBUG_printf("signalling RX\n");
+//  DEBUG_hexdump(buffer, res);
+ 
+  navi_ctx->signalling_rx_time=navi_current_time(navi_ctx);
 
   if ((buffer[0]&0x80)!=0x80) {
     DEBUG_FAILURE(navi_ctx, "bad reply code %02x\n",buffer[0]);
@@ -474,12 +476,14 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
       break;
   }
 
+/*
   if (decrypted_data) {
     DEBUG_printf("signalling RX decrypted %d\n",decrypted_len);
     DEBUG_hexdump(decrypted_data, decrypted_len);
   } else {
     DEBUG_printf("signalling RX decrypted NULL\n");
   }
+*/
 
   switch (buffer[0]&0x7f) {
     case NS_GET_CLIENTS:
@@ -512,6 +516,7 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
               DEBUG_FAILURE(navi_ctx, "'answer_event' hook reject answer\n");
               free(name);
               free(sdp);
+              FREEP(decrypted_data);
               navi_inc_perfcounter(&navi_ctx->counters.signalling_rx_error);
               return -1;
             }
@@ -521,6 +526,7 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
               DEBUG_FAILURE(navi_ctx, "can't set remote answer\n");
               free(name);
               free(sdp);
+              FREEP(decrypted_data);
               navi_inc_perfcounter(&navi_ctx->counters.signalling_rx_error);
               return -1;
             }
@@ -563,6 +569,8 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
       }
       break;
   }
+
+  FREEP(decrypted_data);
 
   if (rx_ok) navi_inc_perfcounter(&navi_ctx->counters.signalling_rx);
   else navi_inc_perfcounter(&navi_ctx->counters.signalling_rx_error);
@@ -1030,7 +1038,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
             if (rx_crc!=dbg_data_crc) {
               DEBUG_printf("rx frame bad crc: calc %08x dbg %08x\n",rx_crc, dbg_data_crc);
             } else {
-              DEBUG_printf("\nDBG stream %08x frame %d data len %d crc %08x\n",stream_ctx->stream_id,rx_packet->packet_id,rx_frame->data.data_len,rx_crc);
+              //DEBUG_printf("\nDBG stream %08x frame %d data len %d crc %08x\n",stream_ctx->stream_id,rx_packet->packet_id,rx_frame->data.data_len,rx_crc);
             }
           }
         }
@@ -1299,7 +1307,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
   uint16_t calculated_crc;
   int payload_len;
 
-  if (NAVI_REQUIRE_PROTOCOL_STATE_EQ(navi_ctx,NAVI_STATE_DISCONNECT)) {
+  if (NAVI_REQUIRE_PROTOCOL_STATE_EQ_Q(navi_ctx,NAVI_STATE_DISCONNECT)) {
     return;
   }
 
@@ -1578,6 +1586,7 @@ int navi_transport_send_offer(struct navi_protocol_ctx_s *navi_ctx) {
   if (!NAVI_REQUIRE_PROTOCOL_STATE_LT(navi_ctx,NAVI_STATE_DH_GENERATE)) return -1;
 
   if (navi_ctx->offer_data) {
+    navi_ctx->offer_time=navi_current_time(navi_ctx);
     return signalling_send(navi_ctx, NS_UPDATE_OFFER, navi_ctx->offer_data, navi_ctx->offer_data_len);
   }
 
@@ -1620,6 +1629,8 @@ int navi_transport_send_offer(struct navi_protocol_ctx_s *navi_ctx) {
   }
 
   navi_set_protocol_state(navi_ctx, NAVI_STATE_ICE, 1);
+
+  navi_ctx->offer_time=navi_current_time(navi_ctx);
 
   return signalling_send(navi_ctx, NS_UPDATE_OFFER, navi_ctx->offer_data, navi_ctx->offer_data_len);
 }
@@ -1717,7 +1728,7 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
     return -1;
   }
 
-	juice_get_local_description(agent, answer_sdp, JUICE_MAX_SDP_STRING_LEN);
+  juice_get_local_description(agent, answer_sdp, JUICE_MAX_SDP_STRING_LEN);
 
   navi_ctx->client_hash=crc32(name, 0xFFFFFFFF, strlen(navi_ctx->config.client_name));
 
@@ -1765,7 +1776,7 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
   if (res<0) return -1;
 
   if (juice_set_remote_description(agent, sdp)) {
-    DEBUG_FAILURE(navi_ctx, "can't set remote description\n");
+    DEBUG_FAILURE(navi_ctx, "can't set remote description\nSDP:\n%s\n\n",sdp);
     return -1;
   }
 
@@ -1848,14 +1859,20 @@ void navi_check_stream_quality(struct navi_protocol_ctx_s *navi_ctx, struct navi
 }
 
 static 
-int navi_transport_work_ICE(struct navi_protocol_ctx_s *navi_ctx) {
+int navi_transport_work_ICE(struct navi_protocol_ctx_s *navi_ctx, const uint64_t now_dt) {
   juice_agent_t *agent=navi_ctx->ice_agent;
 
-  DEBUG_printf("navi_transport_work_ICE: ice_agent_state (start) %d\n",navi_ctx->ice_agent_state);
+//  DEBUG_printf("navi_transport_work_ICE: ice_agent_state (start) %d\n",navi_ctx->ice_agent_state);
 
   signalling_check(navi_ctx);
 
-  DEBUG_printf("navi_transport_work_ICE: ice_agent_state (check) %d\n",navi_ctx->ice_agent_state);
+  if (now_dt<navi_ctx->offer_time) navi_ctx->offer_time=0;
+
+  if (navi_ctx->ice_agent_state==JUICE_STATE_DISCONNECTED && (now_dt-navi_ctx->offer_time)>NAVI_OFFER_RESEND) {
+    navi_transport_send_offer(navi_ctx);
+  }
+
+//  DEBUG_printf("navi_transport_work_ICE: ice_agent_state (check) %d\n",navi_ctx->ice_agent_state);
 
   if (navi_ctx->ice_agent_state==JUICE_STATE_CONNECTED || navi_ctx->ice_agent_state==JUICE_STATE_COMPLETED) {
     navi_set_protocol_state(navi_ctx, NAVI_STATE_DH_GENERATE, 1);
@@ -2219,10 +2236,10 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
       navi_set_protocol_state(navi_ctx, navi_ctx->delayed_state_change, 1);
       navi_ctx->delayed_state_change=NAVI_STATE_NOREPORT;
     }
-    DEBUG_printf("%p: ********** work state %d\n",navi_ctx, state0);
+    //DEBUG_printf("%p: ********** work state %d\n",navi_ctx, state0);
     switch (navi_get_protocol_state(navi_ctx)) {
       case NAVI_STATE_INIT: return 0;
-      case NAVI_STATE_ICE: res=navi_transport_work_ICE(navi_ctx); break;
+      case NAVI_STATE_ICE: res=navi_transport_work_ICE(navi_ctx, now_dt); break;
       case NAVI_STATE_DH_GENERATE: res=navi_transport_work_DH_GENERATE(navi_ctx); break;
       case NAVI_STATE_DH_SEND: res=navi_transport_work_DH_SEND(navi_ctx); break;
       case NAVI_STATE_DH_RECEIVED: res=navi_transport_work_DH_RECEIVED(navi_ctx); break;
@@ -2233,7 +2250,7 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
       case NAVI_STATE_RECONNECT: res=navi_transport_work_RECONNECT(navi_ctx); break;
     }
     state1=navi_get_protocol_state(navi_ctx);
-    DEBUG_printf("%p: ********** end work state %d res %d\n",navi_ctx, state1, res);
+    //DEBUG_printf("%p: ********** end work state %d res %d\n",navi_ctx, state1, res);
     if (res<0) return res;
     if (state1==state0) return res;
     DEBUG_printf("%p: work again\n",navi_ctx);
@@ -2304,7 +2321,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
     debug_packet.head.frame_size=htobe32(sizeof(struct NaviProtocolStreamDebug)-sizeof(struct NaviProtocolDataFrameHeader));
     debug_packet.data_len=htobe32(packet_size);
     debug_packet.data_crc=htobe32(crc32(packet_data, 0xFFFFFFFF, packet_size));
-    DEBUG_printf("\nDBG stream %08x frame %d data len %d crc %08x\n",stream_ctx->stream_id,stream_ctx->packet_id,packet_size,be32toh(debug_packet.data_crc));
+    //DEBUG_printf("\nDBG stream %08x frame %d data len %d crc %08x\n",stream_ctx->stream_id,stream_ctx->packet_id,packet_size,be32toh(debug_packet.data_crc));
     if (stream_ctx->desc.encryption==NAVI_ENCRYPT_NONE) {
       debug_data=&debug_packet;
       debug_data_len=sizeof(debug_packet);
@@ -2320,7 +2337,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
       DEBUG_FAILURE(navi_ctx,"Can't make debug data stream %p\n",stream_ctx);
        return -1;
     }
-    DEBUG_printf("** debug packet flags %02x\n",debug_packet.head.flags);
+    //DEBUG_printf("** debug packet flags %02x\n",debug_packet.head.flags);
     if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, debug_data, debug_data_len)<0) {
       DEBUG_FAILURE(navi_ctx, "Can't send data debug frame\n");
       return -1;

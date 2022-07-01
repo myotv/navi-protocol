@@ -8,10 +8,6 @@
 
 #define NAVI_INFO_STREAM 0x4e415649
 
-#define NAVI_SIGNALLING_STATE_READY 0
-#define NAVI_SIGNALLING_STATE_BUSY 1
-#define NAVI_SIGNALLING_STATE_RECONNECT 2
-
 #define NAVI_MULTICAST_DISCOVERY_PORT 5000
 
 struct NaviProtocolFrameHeader {
@@ -66,7 +62,7 @@ int navi_protocol_frame_size(struct NaviProtocolFrameHeader *head) {
 
 static inline
 int navi_check_rx_frame_size(const int rx_size, struct NaviProtocolFrameHeader *head) {
-  if (rx_size<sizeof(struct NaviProtocolFrameHeader)) return 0;
+  if (rx_size<(int)sizeof(struct NaviProtocolFrameHeader)) return 0;
   return rx_size==navi_protocol_frame_size(head);
 }
 

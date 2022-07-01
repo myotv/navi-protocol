@@ -8,6 +8,7 @@
 #define NAVI_STATS_PERIOD 2000 // 2sec
 #define NAVI_QUALITY_PERIOD 2000 // 2sec
 #define NAVI_RECONNECT_DELAY 2000
+#define NAVI_OFFER_RESEND 2000
 
 #define NAVI_MCAST_ANNOUNCE_PERIOD 2000
 
@@ -125,6 +126,8 @@ struct navi_protocol_ctx_s {
   enum navi_protocol_state_e report_state_change;
   enum navi_protocol_state_e delayed_state_change;
   uint64_t delayed_state_change_time;
+  uint64_t offer_time;
+  uint64_t signalling_rx_time;
   struct {
     bool enable;
     void *encrypt_ctx;
@@ -199,6 +202,11 @@ void navi_set_protocol_state(struct navi_protocol_ctx_s *navi_ctx, const enum na
 #define NAVI_REQUIRE_PROTOCOL_STATE_EQ(_ctx, _state) ({ \
   enum navi_protocol_state_e _proto_state=navi_get_protocol_state(_ctx); \
   if (_proto_state!=_state) DEBUG_FAILURE(_ctx,"bad protocol state %d\n",_proto_state); \
+  _proto_state==_state; \
+})
+
+#define NAVI_REQUIRE_PROTOCOL_STATE_EQ_Q(_ctx, _state) ({ \
+  enum navi_protocol_state_e _proto_state=navi_get_protocol_state(_ctx); \
   _proto_state==_state; \
 })
 
