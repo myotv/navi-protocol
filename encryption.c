@@ -485,10 +485,10 @@ void test_encryption(void) {
   ERR_load_crypto_strings();
 
   EVP_PKEY *pk1=generate_pkey(NULL);
-  DEBUG_printf("pk1 %p %d\n",pk1,pk1->type);  
+  DEBUG_printf("pk1 %p %d\n",pk1,EVP_PKEY_id(pk1));  
 
   EVP_PKEY *pk2=generate_pkey(NULL);
-  DEBUG_printf("pk2 %p %d\n",pk2,pk2->type);  
+  DEBUG_printf("pk2 %p %d\n",pk2,EVP_PKEY_id(pk2));  
 
 
   int klen;
