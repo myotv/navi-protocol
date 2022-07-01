@@ -447,6 +447,8 @@ void *navi_decrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
   EVP_CIPHER_CTX *ctx=(EVP_CIPHER_CTX *)navi_ctx->mcast.decrypt_ctx;
   uint8_t *remote_iv=(uint8_t*)payload;
 
+  if (payload_len<=0) return NULL;
+
   if (payload_len<=sizeof(sizeof(navi_ctx->mcast.local_iv))) {
     DEBUG_FAILURE(navi_ctx, "mcast: short packet, len %d\n",payload_len);
     return NULL;
