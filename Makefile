@@ -1,9 +1,9 @@
-CC=gcc-6
-
 .SUFFIXES: .c .o .cpp .h
 .PHONY: all clean
 
-CFLAGS=-MMD -O3 -march=broadwell  -funsigned-char -g -std=c11 -D_FILE_OFFSET_BITS=64 -Werror -D_GNU_SOURCE -fvisibility=hidden
+CFLAGS=-MMD -O3 -funsigned-char -g -std=c11 -D_FILE_OFFSET_BITS=64 -Werror -D_GNU_SOURCE -fvisibility=hidden
+
+-include .localsetup
 
 TESTS=
 

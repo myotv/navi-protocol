@@ -101,4 +101,6 @@ _*
 
 test_client*
 .localtests
+.localsetup
+
 
