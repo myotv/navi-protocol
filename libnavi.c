@@ -53,7 +53,8 @@ struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, st
   }
 
   // FIXME: calculate MSS based on real network data
-  ctx->mss=1408;  // length without navi header 
+  //ctx->mss=1408;  // length without navi header 
+  ctx->mss=1300;  // length without navi header 
 
   ctx->mcast.enable=config->multicast_enable;
 
