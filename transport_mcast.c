@@ -125,7 +125,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
     struct navi_protocol_stream_list_s *streams=NULL;
 
     res=recvfrom(mcast_discovery_fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&pkt_addr, &pkt_addr_len);
-    if (res<sizeof(navi_ctx->mcast.local_iv)) return;
+    if (res<(ssize_t)sizeof(navi_ctx->mcast.local_iv)) return;
 
     // loopback check
     if (memcmp(buffer, navi_ctx->mcast.local_iv, sizeof(navi_ctx->mcast.local_iv))==0) {
