@@ -337,6 +337,8 @@ int navi_generate_mcast_secret(struct navi_protocol_ctx_s *navi_ctx) {
   RAND_bytes(navi_ctx->mcast.local_iv, sizeof(navi_ctx->mcast.local_iv));
 
   navi_ctx->mcast.secret_valid=true;
+
+  return 0;
 }
 
 void *navi_encrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *payload, const int payload_len, int *encrypted_len, void *dst_buffer) {

@@ -10,4 +10,8 @@
 #define NAVI_ALLOW_CONSTRUCTOR_INIT 1
 #endif
 
+#ifndef NAVI_WITH_MULTICAST
+#define NAVI_WITH_MULTICAST 0
+#endif
+
 #endif

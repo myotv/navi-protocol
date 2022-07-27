@@ -373,8 +373,8 @@ void *navi_transport_mcast_rx_thread(void *arg) {
         }
       }
     }
-
   }
+  return NULL;
 }
 
 static
@@ -602,4 +602,3 @@ void navi_start_mcast_receive(struct navi_protocol_ctx_s *navi_ctx, const struct
     navi_ctx->events.rx_stream_event(navi_ctx, NULL, 0, NULL, navi_ctx->events.rx_stream_event_data);
   }
 }
-

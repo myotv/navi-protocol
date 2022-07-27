@@ -95,6 +95,7 @@ TLV_MAKE_DICT(protocol_data_dict,
   TLV_DICT(DICT_ANOUNCE_STREAM, encode_stream, encode_stream_arr, decode_stream, NULL), // stream data
 );
 
+#if NAVI_WITH_MULTICAST==1
 TLV_MAKE_DICT(multicast_announce_dict,
   TLV_DICT(DICT_MCAST_DOMAIN, encode_strz, NULL, decode_strz, NULL), // domain name
   TLV_DICT(DICT_MCAST_CLIENT_NAME, encode_strz, NULL, decode_strz, NULL), // client name
@@ -103,6 +104,7 @@ TLV_MAKE_DICT(multicast_announce_dict,
   TLV_DICT(DICT_MCAST_PORT, encode_u16, NULL, decode_u16, NULL), // port
   TLV_DICT(DICT_MCAST_STREAMS, encode_stream, encode_stream_arr, decode_stream_desc, NULL), // stream data
 );
+#endif
 
 TLV_MAKE_DICT(stream_data_dict,
   TLV_DICT(DICT_STREAM_STREAM_ID, encode_u32, NULL, decode_u32, NULL),
@@ -204,7 +206,9 @@ struct navi_stream_ctx_s *get_stream_by_id_in_queue(const uint32_t stream_id, st
 
 static void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtocolFrameHeader *head, struct NaviProtocolDataFrameHeader *fragment_head, const uint32_t stream_id, struct navi_stream_ctx_s *stream_ctx, const bool mcast_src);
 
+#if NAVI_WITH_MULTICAST==1
 #include "transport_mcast.c"
+#endif
 
 static
 int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
@@ -606,6 +610,7 @@ int navi_send_frame(struct navi_protocol_ctx_s *navi_ctx, const int frame_type, 
   return juice_send(agent, data, data_len);
 }
 
+#if NAVI_WITH_MULTICAST==1
 static
 int navi_send_mcast_frame(struct navi_protocol_ctx_s *navi_ctx, const int frame_type, const uint32_t stream_id, const void *payload, const int payload_len) {
   if (!navi_mcast_available(navi_ctx)) return 0;
@@ -633,6 +638,7 @@ int navi_send_mcast_frame(struct navi_protocol_ctx_s *navi_ctx, const int frame_
 
   return res;
 }
+#endif
 
 static
 void on_state_changed(juice_agent_t *agent, juice_state_t state, void *user_ptr) {
@@ -1699,6 +1705,8 @@ int navi_transport_get_clients(struct navi_protocol_ctx_s *navi_ctx) {
   sleep(1);
 
   signalling_check(navi_ctx);
+
+  return 0;
 }
 
 int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const char *name, const char *sdp) {
@@ -2211,6 +2219,7 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
     int res=-1;
     const uint64_t now_dt=navi_current_time(navi_ctx);
 
+    #if NAVI_WITH_MULTICAST==1
     if (navi_ctx->mcast.enable) {
       if (!navi_ctx->mcast.secret_valid) {
         navi_generate_mcast_secret(navi_ctx);
@@ -2218,6 +2227,7 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
       navi_check_mcast_discovery(navi_ctx, now_dt);
       if (navi_ctx->tx_streams) navi_send_mcast_announce(navi_ctx, now_dt);
     }
+    #endif
 
     if (!navi_ctx->config.unicast_enable) {
       return 0;
@@ -2259,7 +2269,11 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
 }
 
 int navi_transport_multicast_ready(struct navi_protocol_ctx_s *navi_ctx) {
+#if NAVI_WITH_MULTICAST==1  
   return navi_mcast_available(navi_ctx) && navi_ctx->mcast.rx_active>0;
+#else
+  return 0;
+#endif
 }
 
 int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, const int64_t dts, const int flags, const void *packet_data, int packet_size) {
@@ -2280,7 +2294,11 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
   int net_send_bytes=0;
   int net_send_bytes_mcast=0;
   const bool send_via_unicast=navi_get_protocol_state(navi_ctx)==NAVI_STATE_ONLINE;
+#if NAVI_WITH_MULTICAST==1
   const bool send_via_mcast=navi_mcast_available(navi_ctx);
+#else
+  const bool send_via_mcast=false;
+#endif
 
   if (packet_size<0 || !packet_data) return -1;
 
@@ -2414,6 +2432,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
               net_send_bytes+=subframe_len+sizeof(struct NaviProtocolDataFrameHeader)+sizeof(struct NaviProtocolFrameHeader);
             }
           }
+          #if NAVI_WITH_MULTICAST==1
           if (send_via_mcast) {
             if (navi_send_mcast_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, data, subframe_len+sizeof(struct NaviProtocolDataFrameHeader))<0) {
               DEBUG_FAILURE(navi_ctx, "Can't send data frame\n");
@@ -2422,6 +2441,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
               net_send_bytes_mcast+=subframe_len+sizeof(struct NaviProtocolDataFrameHeader)+sizeof(struct NaviProtocolFrameHeader);
             }
           }
+          #endif
         }
         break;
       case NAVI_ENCRYPT_KEYFRAME:
@@ -2452,6 +2472,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
             }
           }
         }
+        #if NAVI_WITH_MULTICAST==1
         if (send_via_mcast) {
           if (!navi_encrypt_with_mcast_secret(navi_ctx, head, sizeof(struct NaviProtocolDataFrameHeader), &encrypted_len, encrypted_data)) {
             DEBUG_FAILURE(navi_ctx,"Can't encrypt data header stream %p\n",stream_ctx);
@@ -2478,6 +2499,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
             }
           }
         }
+        #endif
         break;
       case NAVI_ENCRYPT_ALL:
         memcpy(payload, data_ptr, subframe_len);
@@ -2506,6 +2528,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
             }
           }
         }
+        #if NAVI_WITH_MULTICAST==1
         if (send_via_mcast) {
           if (!navi_encrypt_with_mcast_secret(navi_ctx, head, sizeof(struct NaviProtocolDataFrameHeader)+subframe_len, &encrypted_len, encrypted_data)) {
             DEBUG_FAILURE(navi_ctx,"Can't encrypt data and header, stream %p\n",stream_ctx);
@@ -2529,6 +2552,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
             }
           }
         }
+        #endif
         break;
     }
 
