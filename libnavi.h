@@ -3,30 +3,6 @@
 
 #include "navi-config.h"
 
-// these macros for debugging development library, must be removed in production build
-#ifdef WITH_DEBUG
-#define DEBUG_IO_STREAM stdout
-#define DEBUG_FAILURE(ctx, format...) do { \
-  fprintf(DEBUG_IO_STREAM, "%p: fail at %s:%d ", ctx, __FILE__, __LINE__); \
-  fprintf(DEBUG_IO_STREAM, format); \
-  fflush(DEBUG_IO_STREAM); \
-} while (0)
-#define DEBUG_FAILURE_A(format...) do { \
-  fprintf(DEBUG_IO_STREAM, "fail at %s:%d ", __FILE__, __LINE__); \
-  fprintf(DEBUG_IO_STREAM, format); \
-  fflush(DEBUG_IO_STREAM); \
-} while (0)
-#define DEBUG_printf(format...) fprintf(DEBUG_IO_STREAM, format)
-#define DEBUG_hexdump(ptr, size) hexdump(ptr, size)
-#define DEBUG_code(flag) if (flag)
-#else
-#define DEBUG_FAILURE(ctx, format...)
-#define DEBUG_FAILURE_A(format...)
-#define DEBUG_printf(format...)
-#define DEBUG_hexdump(ptr, size)
-#define DEBUG_code(flag) if (0)
-#endif
-
 enum navi_loglevel_e {
   LL_NAVI_NONE=0,
   LL_NAVI_CRITICAL,
@@ -230,5 +206,40 @@ extern void *navi_logger_func_arg;
   pthread_spin_unlock(&navi_logger_lock); \
   if (fn) fn(level, navi_ctx, stream_ctx, navi_logger_func_arg, format); \
 } while (0)
+
+// these macros for debugging development library, must be removed in production build
+#ifdef WITH_DEBUG
+#define DEBUG_FAILURE(navi_ctx, stream_ctx, format...) do { \
+  pthread_spin_lock(&navi_logger_lock); \
+  navi_logger_t fn=navi_logger_func; \
+  void *arg=navi_logger_func_arg; \
+  pthread_spin_unlock(&navi_logger_lock); \
+  if (fn) { \
+    fn(LL_NAVI_DEBUG, navi_ctx, stream_ctx, navi_logger_func_arg, "fail at %s:%d ", __FILE__, __LINE__); \
+    fn(LL_NAVI_DEBUG, navi_ctx, stream_ctx, navi_logger_func_arg, format); \
+  } \
+} while (0)
+#define DEBUG_FAILURE_A(format...) do { \
+  pthread_spin_lock(&navi_logger_lock); \
+  navi_logger_t fn=navi_logger_func; \
+  void *arg=navi_logger_func_arg; \
+  pthread_spin_unlock(&navi_logger_lock); \
+  if (fn) { \
+    fn(LL_NAVI_DEBUG, NULL, NULL, navi_logger_func_arg, "fail at %s:%d ", __FILE__, __LINE__); \
+    fn(LL_NAVI_DEBUG, NULL, NULL, navi_logger_func_arg, format); \
+  } \
+} while (0)
+#define DEBUG_printf(navi_ctx, stream_ctx, format...) NAVI_LOG(LL_NAVI_DEBUG, navi_ctx, stream_ctx, format)
+#define DEBUG_printf_a(format...) NAVI_LOG(LL_NAVI_DEBUG, NULL, NULL, format)
+#define DEBUG_hexdump(ptr, size) hexdump(ptr, size)
+#define DEBUG_code(flag) if (flag)
+#else
+#define DEBUG_FAILURE(ctx, format...)
+#define DEBUG_FAILURE_A(format...)
+#define DEBUG_printf(navi_ctx, stream_ctx, format...)
+#define DEBUG_printf_a(format...)
+#define DEBUG_hexdump(ptr, size)
+#define DEBUG_code(flag) if (0)
+#endif
 
 #endif

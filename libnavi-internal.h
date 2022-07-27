@@ -188,7 +188,7 @@ void _navi_set_protocol_state(struct navi_protocol_ctx_s *navi_ctx, const enum n
   navi_ctx->state=state;
   navi_ctx->report_state_change=state;
   if (with_lock) NAVI_UNLOCK_CTX(navi_ctx);
-  DEBUG_printf("%p: %s:%d: set state from %d to %d\n",navi_ctx, file, line, old_state, state);
+  DEBUG_printf(navi_ctx,NULL,"%s:%d: set state from %d to %d\n",file, line, old_state, state);
 }
 #else 
 static inline
@@ -201,7 +201,7 @@ void navi_set_protocol_state(struct navi_protocol_ctx_s *navi_ctx, const enum na
 
 #define NAVI_REQUIRE_PROTOCOL_STATE_EQ(_ctx, _state) ({ \
   enum navi_protocol_state_e _proto_state=navi_get_protocol_state(_ctx); \
-  if (_proto_state!=_state) DEBUG_FAILURE(_ctx,"bad protocol state %d\n",_proto_state); \
+  if (_proto_state!=_state) DEBUG_FAILURE(_ctx, NULL, "bad protocol state %d\n",_proto_state); \
   _proto_state==_state; \
 })
 
@@ -212,13 +212,13 @@ void navi_set_protocol_state(struct navi_protocol_ctx_s *navi_ctx, const enum na
 
 #define NAVI_REQUIRE_PROTOCOL_STATE_GT(_ctx, _state) ({ \
   enum navi_protocol_state_e _proto_state=navi_get_protocol_state(_ctx); \
-  if (_proto_state<=_state) DEBUG_FAILURE(_ctx,"bad protocol state %d\n",_proto_state); \
+  if (_proto_state<=_state) DEBUG_FAILURE(_ctx, NULL, "bad protocol state %d\n",_proto_state); \
   _proto_state>_state; \
 })
 
 #define NAVI_REQUIRE_PROTOCOL_STATE_LT(_ctx, _state) ({ \
   enum navi_protocol_state_e _proto_state=navi_get_protocol_state(_ctx); \
-  if (_proto_state>_state) DEBUG_FAILURE(_ctx,"bad protocol state %d\n",_proto_state); \
+  if (_proto_state>_state) DEBUG_FAILURE(_ctx, NULL, "bad protocol state %d\n",_proto_state); \
   _proto_state<=_state; \
 })
 

@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <unistd.h>
 #include <netinet/ip.h>
+#include <pthread.h>
 
 #include <openssl/evp.h>
 #include <openssl/ec.h>
@@ -30,43 +31,43 @@ EVP_PKEY *generate_pkey(struct navi_protocol_ctx_s *navi_ctx) {
 
   ctx=EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
   if (!ctx) {
-    DEBUG_FAILURE(navi_ctx, "can't get pkey_ctx\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't get pkey_ctx\n");
     return NULL;
   }
 
   if (!EVP_PKEY_paramgen_init(ctx)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "error in EVP_PKEY_paramgen_init\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "error in EVP_PKEY_paramgen_init\n");
     return NULL;
   }
 
   if (!EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NAVI_EC_CURVE)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "error in EVP_PKEY_CTX_set_ec_paramgen_curve_nid\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "error in EVP_PKEY_CTX_set_ec_paramgen_curve_nid\n");
     return NULL;
   }
 
   if (!EVP_PKEY_paramgen(ctx, &params)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "error in EVP_PKEY_paramgen\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "error in EVP_PKEY_paramgen\n");
     return NULL;
   }
 
   kctx=EVP_PKEY_CTX_new(params, NULL);
   if (!ctx) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "can't get pkey_kctx\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't get pkey_kctx\n");
     return NULL;
   }
 
   if (!EVP_PKEY_keygen_init(kctx)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "error in EVP_PKEY_keygen_init\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "error in EVP_PKEY_keygen_init\n");
     return NULL;
   }
 
   if (!EVP_PKEY_keygen(kctx, &res)) {
-    DEBUG_FAILURE(navi_ctx, "error in EVP_PKEY_keygen\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "error in EVP_PKEY_keygen\n");
     res=NULL;
   }
 
@@ -116,27 +117,27 @@ uint8_t *generate_secret(struct navi_protocol_ctx_s *navi_ctx, EVP_PKEY *local_k
 
   ctx=EVP_PKEY_CTX_new(local_key, NULL);
   if (!ctx)	{
-    DEBUG_FAILURE(navi_ctx, "create ctx\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "create ctx\n");
     *secret_len=0;
     return NULL;
   }
   if (!EVP_PKEY_derive_init(ctx)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "derive init\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "derive init\n");
     *secret_len=0;
     return NULL;
   }
 
   if (!EVP_PKEY_derive_set_peer(ctx, remote_key)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "derive set remote key\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "derive set remote key\n");
     *secret_len=0;
     return NULL;
   }
 
   if (!EVP_PKEY_derive(ctx, NULL, secret_len)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "get secret len\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "get secret len\n");
     *secret_len=0;
     return NULL;
   }
@@ -144,7 +145,7 @@ uint8_t *generate_secret(struct navi_protocol_ctx_s *navi_ctx, EVP_PKEY *local_k
   secret=(uint8_t *)malloc(*secret_len);
   if (!EVP_PKEY_derive(ctx, secret, secret_len)) {
     EVP_PKEY_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "get secret data\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "get secret data\n");
     free(secret);
     *secret_len=0;
     return NULL;
@@ -173,7 +174,7 @@ void *navi_encrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->secret_hash, res /* iv */, 1)) {
     EVP_CIPHER_CTX_free(ctx);
     free(res);
-    DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *encrypted_len=0;
     return NULL;
   }
@@ -210,7 +211,7 @@ void *navi_decrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->secret_hash, payload_ptr /* iv */, 0)) {
     EVP_CIPHER_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *decrypted_len=0;
     return NULL;
   }
@@ -219,14 +220,14 @@ void *navi_decrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
 
   if (!EVP_CipherUpdate(ctx, decrypted_data, &res_len, payload_ptr+16, payload_len-16)) {
     EVP_CIPHER_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "can't update cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't update cipher\n");
     *decrypted_len=0;
     return NULL;
   }
 
   if (!EVP_CipherFinal_ex(ctx, decrypted_data+res_len, &tail_len)) {
     EVP_CIPHER_CTX_free(ctx);
-    DEBUG_FAILURE(navi_ctx, "can't decrypt\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't decrypt\n");
     *decrypted_len=0;
     return NULL;
   }
@@ -239,13 +240,13 @@ void *navi_decrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
 
   if (res_len!=(be16toh(head[0])+4)) {
     *decrypted_len=0;
-    DEBUG_FAILURE(navi_ctx, "bad decrypted length\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "bad decrypted length\n");
     return NULL;
   }
 
   if (be16toh(head[1])!=crc16(&head[2], 0xFFFF, res_len-4)) {
     *decrypted_len=0;
-    DEBUG_FAILURE(navi_ctx, "bad decrypted crc\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "bad decrypted crc\n");
     return NULL;
   }
 
@@ -273,13 +274,13 @@ int navi_generate_keys(struct navi_protocol_ctx_s *navi_ctx) {
 
   key=generate_pkey(navi_ctx);
   if (!key) {
-    DEBUG_FAILURE(navi_ctx, "Can't generate DH key\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "Can't generate DH key\n");
     return -1;
   }
   navi_ctx->local_pkey_data=export_pkey(key, &navi_ctx->local_pkey_len);
   if (!navi_ctx->local_pkey_data) {
     EVP_PKEY_free(key);
-    DEBUG_FAILURE(navi_ctx, "Can't export DH key\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "Can't export DH key\n");
     return -1;
   }
   navi_ctx->local_pkey=key;
@@ -297,14 +298,14 @@ int navi_generate_secret(struct navi_protocol_ctx_s *navi_ctx) {
 
   EVP_PKEY *remote_key=import_public_key(navi_ctx->remote_pkey_data, navi_ctx->local_pkey_len);
   if (!remote_key) {
-    DEBUG_FAILURE(navi_ctx, "can't import public key\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't import public key\n");
     return -1;
   }
 
   secret=generate_secret(navi_ctx, navi_ctx->local_pkey, remote_key, &secret_len);
   EVP_PKEY_free(remote_key);
   if (!secret) {
-    DEBUG_FAILURE(navi_ctx, "Can't generate secret\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "Can't generate secret\n");
     return -1;
   }
 
@@ -315,7 +316,7 @@ int navi_generate_secret(struct navi_protocol_ctx_s *navi_ctx) {
   MD5_Final(navi_ctx->encryption_key, &md5);
   free(secret);
 
-  DEBUG_printf("%p: encryption key\n",navi_ctx);
+  DEBUG_printf(navi_ctx,NULL,"encryption key\n");
   DEBUG_hexdump(navi_ctx->encryption_key,sizeof(navi_ctx->encryption_key));
 
   MD5(navi_ctx->remote_pkey_data, navi_ctx->local_pkey_len, navi_ctx->remote_iv);
@@ -359,7 +360,7 @@ void *navi_encrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *pa
     if (!dst_buffer) free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->encrypt_ctx=NULL;
-    DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *encrypted_len=0;
     return NULL;
   }
@@ -392,7 +393,7 @@ void *navi_decrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *pa
     free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->decrypt_ctx=NULL;
-    DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *decrypted_len=0;
     return NULL;
   }
@@ -407,6 +408,7 @@ void *navi_decrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *pa
   return (void*)res;
 }
 
+#if NAVI_WITH_MULTICAST==1
 void *navi_encrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void *payload, const int payload_len, int *encrypted_len, void *dst_buffer) {
   uint8_t *res=(uint8_t *)dst_buffer;
   int res_len;
@@ -425,7 +427,7 @@ void *navi_encrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
     if (!dst_buffer) free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->mcast.encrypt_ctx=NULL;
-    DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *encrypted_len=0;
     return NULL;
   }
@@ -452,7 +454,7 @@ void *navi_decrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
   if (payload_len<=0) return NULL;
 
   if (payload_len<=sizeof(sizeof(navi_ctx->mcast.local_iv))) {
-    DEBUG_FAILURE(navi_ctx, "mcast: short packet, len %d\n",payload_len);
+    DEBUG_FAILURE(navi_ctx, NULL, "mcast: short packet, len %d\n",payload_len);
     return NULL;
   }
 
@@ -468,7 +470,7 @@ void *navi_decrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
     free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->mcast.decrypt_ctx=NULL;
-    DEBUG_FAILURE(navi_ctx, "can't init cipher\n");
+    DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *decrypted_len=0;
     return NULL;
   }
@@ -482,15 +484,16 @@ void *navi_decrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
 
   return (void*)res;
 }
+#endif
 
 void test_encryption(void) {
   ERR_load_crypto_strings();
 
   EVP_PKEY *pk1=generate_pkey(NULL);
-  DEBUG_printf("pk1 %p %d\n",pk1,EVP_PKEY_id(pk1));  
+  DEBUG_printf_a("pk1 %p %d\n",pk1,EVP_PKEY_id(pk1));  
 
   EVP_PKEY *pk2=generate_pkey(NULL);
-  DEBUG_printf("pk2 %p %d\n",pk2,EVP_PKEY_id(pk2));  
+  DEBUG_printf_a("pk2 %p %d\n",pk2,EVP_PKEY_id(pk2));  
 
 
   int klen;
@@ -499,11 +502,11 @@ void test_encryption(void) {
 
   EVP_PKEY *ikey=import_public_key(data, klen);
   ERR_print_errors_fp(stdout);
-  DEBUG_printf("ipk %p\n",ikey);
+  DEBUG_printf_a("ipk %p\n",ikey);
 
   size_t secret_len;
   uint8_t *secret=generate_secret(NULL, pk2, ikey, &secret_len);
-  DEBUG_printf("secret %p len %lu\n",secret,secret_len);
+  DEBUG_printf_a("secret %p len %lu\n",secret,secret_len);
   if (secret) {
     DEBUG_hexdump(secret, secret_len);
   }

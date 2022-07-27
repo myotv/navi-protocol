@@ -6,6 +6,7 @@
 #include <endian.h>
 #include <alloca.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "libnavi.h"
 #include "tlv.h"
@@ -37,17 +38,17 @@ int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struc
       type=is_array;
       repeat_count=va_arg(ap, int);
       if (repeat_count<1) {
-        DEBUG_FAILURE(navi_ctx, "bad repeat count %d arg %d\n",repeat_count,arg);
+        DEBUG_FAILURE(navi_ctx, NULL, "bad repeat count %d arg %d\n",repeat_count,arg);
         return -1;
       }
     }
 
     if (type>max_type) {
-      DEBUG_FAILURE(navi_ctx, "bad tlv type %d arg %d\n",type,arg);
+      DEBUG_FAILURE(navi_ctx, NULL, "bad tlv type %d arg %d\n",type,arg);
       return -1;
     }
     if (dictionary[type].type!=type) {
-      DEBUG_FAILURE(navi_ctx, "bad tlv dict type %d (%d) arg %d\n",type,dictionary[type].type,arg);
+      DEBUG_FAILURE(navi_ctx, NULL, "bad tlv dict type %d (%d) arg %d\n",type,dictionary[type].type,arg);
       return -1;
     }
 
@@ -60,17 +61,17 @@ int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struc
           encode_size=dictionary[type].encode(ap, H->data, user_ctx);
         } else {
           if (!dictionary[type].encode_array) {
-            DEBUG_FAILURE(navi_ctx, "no array encoder for arg %d\n",arg);
+            DEBUG_FAILURE(navi_ctx, NULL, "no array encoder for arg %d\n",arg);
             return -1;
           }
           if (!array_ptr) {
-            DEBUG_FAILURE(navi_ctx, "null array pointer for arg %d\n",arg);
+            DEBUG_FAILURE(navi_ctx, NULL, "null array pointer for arg %d\n",arg);
             return -1;
           }
           encode_size=dictionary[type].encode_array(array_ptr, idx, H->data, user_ctx);
         }
         if (encode_size<0) {
-          DEBUG_FAILURE(navi_ctx, "can't encode type %d arg %d\n",type,arg);
+          DEBUG_FAILURE(navi_ctx, NULL, "can't encode type %d arg %d\n",type,arg);
           return -1;
         }
         H->type=type;
@@ -86,17 +87,17 @@ int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struc
           encode_size=dictionary[type].encode(ap, NULL, user_ctx);
         } else {
           if (!dictionary[type].encode_array) {
-            DEBUG_FAILURE(navi_ctx, "no array encoder for arg %d\n",arg);
+            DEBUG_FAILURE(navi_ctx, NULL, "no array encoder for arg %d\n",arg);
             return -1;
           }
           if (!array_ptr) {
-            DEBUG_FAILURE(navi_ctx, "null array pointer for arg %d\n",arg);
+            DEBUG_FAILURE(navi_ctx, NULL, "null array pointer for arg %d\n",arg);
             return -1;
           }
           encode_size=dictionary[type].encode_array(array_ptr, idx, NULL, user_ctx);
         }
         if (encode_size<0) {
-          DEBUG_FAILURE(navi_ctx, "can't encode type %d arg %d\n",type,arg);
+          DEBUG_FAILURE(navi_ctx, NULL, "can't encode type %d arg %d\n",type,arg);
           return -1;
         }
         res+=encode_size+sizeof(struct tlv_header_s);
@@ -134,13 +135,13 @@ int tlv_decode(struct navi_protocol_ctx_s *navi_ctx, void *src_data, const int s
       type=is_array;
     }
     if (type>max_type) {
-      DEBUG_FAILURE(navi_ctx, "bad type %d arg %d\n",type,arg);
+      DEBUG_FAILURE(navi_ctx, NULL, "bad type %d arg %d\n",type,arg);
       return -1;
     }
     if (is_array) {
       array_size[type]=va_arg(ap, int);
       if (!dictionary[type].decode_array) {
-        DEBUG_FAILURE(navi_ctx,"No array decoder for type %d\n",type);
+        DEBUG_FAILURE(navi_ctx, NULL, "No array decoder for type %d\n",type);
         return -1;
       }
     }
@@ -154,7 +155,7 @@ int tlv_decode(struct navi_protocol_ctx_s *navi_ctx, void *src_data, const int s
     int len;
     if (H->type==TLV_END) break;
     if (H->type>max_type) {
-      DEBUG_FAILURE(navi_ctx, "bad type at ptr %d\n",res);
+      DEBUG_FAILURE(navi_ctx, NULL, "bad type at ptr %d\n",res);
       return -1;
     }
     len=be16toh(H->len);
@@ -163,14 +164,14 @@ int tlv_decode(struct navi_protocol_ctx_s *navi_ctx, void *src_data, const int s
         if (array_ptr[H->type]<array_size[H->type]) {
           decode_res=dictionary[H->type].decode_array(H->data, len, dst_data[H->type], array_ptr[H->type]++, user_ctx);
         } else {
-          DEBUG_FAILURE(navi_ctx,"array overflow for type %d ptr %d\n",H->type,res);
+          DEBUG_FAILURE(navi_ctx, NULL, "array overflow for type %d ptr %d\n",H->type,res);
           return -1;
         }
       } else {
         decode_res=dictionary[H->type].decode(H->data, len, dst_data[H->type], user_ctx);
       }
       if (decode_res<0) {
-        DEBUG_FAILURE(navi_ctx, "can't decode type %d at %d size %d\n",H->type,res,len);
+        DEBUG_FAILURE(navi_ctx, NULL, "can't decode type %d at %d size %d\n",H->type,res,len);
         return -1;
       }
     }

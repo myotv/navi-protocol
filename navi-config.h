@@ -11,7 +11,7 @@
 #endif
 
 #ifndef NAVI_WITH_MULTICAST
-#define NAVI_WITH_MULTICAST 0
+#define NAVI_WITH_MULTICAST 1
 #endif
 
 #endif

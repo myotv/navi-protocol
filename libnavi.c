@@ -57,7 +57,7 @@ struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, st
   calculate_hashes(ctx);
 
   if (navi_transport_create(ctx)) {
-    DEBUG_FAILURE(ctx, "Can't create transport\n");
+    DEBUG_FAILURE(ctx, NULL, "Can't create transport\n");
     free(ctx);
     return NULL;
   }
@@ -68,7 +68,7 @@ struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, st
 
   ctx->mcast.enable=config->multicast_enable;
 
-  DEBUG_printf("navi create state: %d\n",navi_protocol_state(ctx));
+  DEBUG_printf(ctx,NULL,"navi create state: %d\n",navi_protocol_state(ctx));
 
   pthread_mutex_init(&ctx->rx_mtx, NULL);
   pthread_cond_init(&ctx->rx_cond, NULL);
@@ -155,7 +155,7 @@ struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, 
 
   stream->last_stats_time=0;
 
-  DEBUG_printf("add stream %s id %08x\n",stream_desc->description,stream->stream_id);
+  DEBUG_printf(navi_ctx, stream, "add stream %s id %08x\n",stream_desc->description,stream->stream_id);
 
   stream->next=navi_ctx->tx_streams;
   navi_ctx->tx_streams=stream;
@@ -208,7 +208,7 @@ int navi_count_received_frames(struct navi_stream_ctx_s *stream_ctx) {
 int navi_check_received_frame(struct navi_protocol_ctx_s *navi_ctx) {
   for (struct navi_stream_ctx_s *stream=navi_ctx->rx_streams; stream; stream=stream->next) {
     if (navi_check_stream_received_frame(stream)) {
-      DEBUG_printf("navi_check_received_frame stream %p %08x\n",stream,stream->stream_id);
+      DEBUG_printf(navi_ctx,NULL,"navi_check_received_frame stream %p %08x\n",stream,stream->stream_id);
       return 1;
     }
   }
@@ -302,7 +302,7 @@ struct navi_received_frame_data_s *navi_get_received_frame(struct navi_protocol_
     res=navi_get_stream_received_frame(navi_ctx->last_rx_stream);
     if (res) {
       if (res->flags&NAVI_DATA_FLAG_DEBUG_DATA_PATH) {
-        DEBUG_printf("\ndebug RX packet from %08x size %d pts %ld dts %ld id %u crc %08x\n",navi_ctx->last_rx_stream->stream_id,res->data_len,res->pts,res->dts,res->packet_id,crc32(res->data,0xFFFFFFFF,res->data_len));
+        DEBUG_printf(navi_ctx,NULL,"\ndebug RX packet from %08x size %d pts %ld dts %ld id %u crc %08x\n",navi_ctx->last_rx_stream->stream_id,res->data_len,res->pts,res->dts,res->packet_id,crc32(res->data,0xFFFFFFFF,res->data_len));
 
       }
       return res;

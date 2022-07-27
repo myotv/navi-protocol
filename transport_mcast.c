@@ -80,7 +80,7 @@ int navi_transport_set_multicast_discovery(const int enable) {
   // ignore result
   setsockopt(mcast_discovery_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 
-  DEBUG_printf("multicast announce/discovery fd %d\n",mcast_discovery_fd);
+  DEBUG_printf_a("multicast announce/discovery fd %d\n",mcast_discovery_fd);
 
   return 0;
 }
@@ -144,7 +144,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
     crc_ptr=(uint16_t *)(decrypted_data+decrypted_len-sizeof(uint16_t));
     rx_crc=htobe16(crc16(decrypted_data, 0xFFFF, decrypted_len-sizeof(uint16_t)));
     if (*crc_ptr!=rx_crc) {
-      DEBUG_FAILURE(navi_ctx,"bad mcast announce crc\n");
+      DEBUG_FAILURE(navi_ctx, NULL, "bad mcast announce crc\n");
       free((void *)decrypted_data);
       continue;
     }
@@ -164,7 +164,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
       TLV_END
     );
 
-    DEBUG_printf("mcast announce: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
+    DEBUG_printf(navi_ctx,NULL,"mcast announce: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
     if (navi_ctx->events.client_event) {
       char *sdp_data;
       char *udp_addr=inet_ntoa(group_addr);
@@ -182,7 +182,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
           domain && strcmp(domain, navi_ctx->config.domain_name)==0) {
         // TODO: if connected via unicast - disconnect, switch to multicast
         if (!navi_ctx->mcast.mcast_socket || navi_ctx->mcast.group_addr.sin_addr.s_addr!=group_addr.s_addr || navi_ctx->mcast.group_addr.sin_port!=udp_port) {
-          DEBUG_printf("start receive mcast from %s on %s:%d\n",client_name,inet_ntoa(group_addr),ntohs(udp_port));
+          DEBUG_printf(navi_ctx,NULL,"start receive mcast from %s on %s:%d\n",client_name,inet_ntoa(group_addr),ntohs(udp_port));
           navi_start_mcast_receive(navi_ctx, group_addr, udp_port, streams);
         }
       }
@@ -248,7 +248,7 @@ void navi_send_mcast_announce(struct navi_protocol_ctx_s *navi_ctx, const uint64
       TLV_END
     );
     if (data_len<0) {
-      DEBUG_FAILURE(navi_ctx, "can't seralize tx streams\n");
+      DEBUG_FAILURE(navi_ctx, NULL, "can't seralize tx streams\n");
       return;
     }
 
@@ -267,7 +267,7 @@ void navi_send_mcast_announce(struct navi_protocol_ctx_s *navi_ctx, const uint64
       TLV_END
     );
     if (data_len<0) {
-      DEBUG_FAILURE(navi_ctx, "can't seralize tx streams\n");
+      DEBUG_FAILURE(navi_ctx, NULL, "can't seralize tx streams\n");
       return;
     }
   
@@ -277,7 +277,7 @@ void navi_send_mcast_announce(struct navi_protocol_ctx_s *navi_ctx, const uint64
 
     navi_ctx->mcast.announce_packet=navi_encrypt_with_mcast_secret(navi_ctx, buffer, data_len, &navi_ctx->mcast.announce_packet_len, NULL);
     if (!navi_ctx->mcast.announce_packet) {
-      DEBUG_FAILURE(navi_ctx,"can't encrypt mcast announce\n");
+      DEBUG_FAILURE(navi_ctx, NULL, "can't encrypt mcast announce\n");
       navi_ctx->mcast.announce_packet_len=0;
       return;
     }
@@ -287,13 +287,13 @@ void navi_send_mcast_announce(struct navi_protocol_ctx_s *navi_ctx, const uint64
 
   res=sendto(mcast_discovery_fd, navi_ctx->mcast.announce_packet, navi_ctx->mcast.announce_packet_len, MSG_DONTWAIT|MSG_NOSIGNAL, (struct sockaddr *)&mcast_announce_addr, sizeof(mcast_announce_addr));
 
-  DEBUG_printf("%p: send mcast discovery %d\n",navi_ctx,res);
+  DEBUG_printf(navi_ctx,NULL,"send mcast discovery %d\n",res);
 
   if (res<0) {
-    DEBUG_FAILURE(navi_ctx,"can't send mcast announce, error %s\n",strerror(errno));
+    DEBUG_FAILURE(navi_ctx, NULL, "can't send mcast announce, error %s\n",strerror(errno));
   } else
   if (res<navi_ctx->mcast.announce_packet_len) {
-    DEBUG_FAILURE(navi_ctx,"mcast announce: short send %d\n",res);
+    DEBUG_FAILURE(navi_ctx, NULL, "mcast announce: short send %d\n",res);
   }
 }
 
@@ -307,7 +307,7 @@ void *navi_transport_mcast_rx_thread(void *arg) {
   if (!navi_ctx->mcast.enable) return NULL;
   if (!navi_ctx->mcast.mcast_socket) return NULL;
 
-  DEBUG_printf("%p: start mcast rx thread fd %d\n",navi_ctx,navi_ctx->mcast.mcast_socket);
+  DEBUG_printf(navi_ctx,NULL,"start mcast rx thread fd %d\n",navi_ctx->mcast.mcast_socket);
 
   navi_ctx->mcast.rx_active=0;
 
@@ -326,12 +326,12 @@ void *navi_transport_mcast_rx_thread(void *arg) {
         usleep(1000);
         continue;
       }
-      DEBUG_FAILURE(navi_ctx,"Can't read from mcast data socket, error %s\n",strerror(errno));
+      DEBUG_FAILURE(navi_ctx, NULL, "Can't read from mcast data socket, error %s\n",strerror(errno));
       return NULL;
     }
 
     if (!navi_check_rx_frame_size(res,head)) {
-      DEBUG_FAILURE(navi_ctx,"Bad frame size %d (need %d)\n",res,navi_protocol_frame_size(head));
+      DEBUG_FAILURE(navi_ctx, NULL, "Bad frame size %d (need %d)\n",res,navi_protocol_frame_size(head));
       navi_inc_perfcounter(&navi_ctx->counters.rx_errors);
       continue;
     }
@@ -344,18 +344,18 @@ void *navi_transport_mcast_rx_thread(void *arg) {
     calculated_crc=crc16(head->payload, crc16(&head_copy, head_copy.crc, sizeof(head_copy)),payload_len);
 
     if (be16toh(head->crc)!=calculated_crc) {
-      DEBUG_FAILURE(navi_ctx, "bad crc %04x calc %04x\n",be16toh(head->crc),calculated_crc);
+      DEBUG_FAILURE(navi_ctx, NULL, "bad crc %04x calc %04x\n",be16toh(head->crc),calculated_crc);
       navi_inc_perfcounter(&navi_ctx->counters.rx_errors);
       continue;
     }
 
     if (head->frameType==NAVICMD_DATA) {
-      DEBUG_printf("data frame stream %08x\n",head->streamId);
+      DEBUG_printf(navi_ctx,NULL,"data frame stream %08x\n",head->streamId);
       if (payload_len>0) {
         int data_len;
         const uint32_t stream_id=be32toh(head->streamId);
         struct navi_stream_ctx_s *stream_ctx=get_stream_by_id_in_queue(stream_id, navi_ctx->rx_streams);
-        DEBUG_printf("RX stream ctx %p\n",stream_ctx);
+        DEBUG_printf(navi_ctx,NULL,"RX stream ctx %p\n",stream_ctx);
         if (stream_ctx) {
           ++navi_ctx->mcast.rx_active;
           navi_add_perfcounter(&stream_ctx->counters.net_rx_rate, res);
@@ -366,7 +366,7 @@ void *navi_transport_mcast_rx_thread(void *arg) {
             if (decrypted_data && data_len>=sizeof(struct NaviProtocolDataFrameHeader)) {
               proced_rx_fragment(navi_ctx, head, (struct NaviProtocolDataFrameHeader*)decrypted_data, stream_id, stream_ctx, true);
             } else {
-              DEBUG_FAILURE(navi_ctx,"Can't decrypt frame fragment header %p %d\n",decrypted_data,data_len);
+              DEBUG_FAILURE(navi_ctx, NULL, "Can't decrypt frame fragment header %p %d\n",decrypted_data,data_len);
             }
             free(decrypted_data);
           }
@@ -396,13 +396,13 @@ int navi_transport_start_multicast_on_addr(struct navi_protocol_ctx_s *navi_ctx,
       case 2:
         if (port<1 || port>65535) {
           free(addr_str);
-          DEBUG_FAILURE(navi_ctx,"Bad port number %d\n",port);
+          DEBUG_FAILURE(navi_ctx, NULL, "Bad port number %d\n",port);
           return -1;
         }
         break;
 
       default:
-        DEBUG_FAILURE(navi_ctx,"Can't parse multicast_tx_group\n");
+        DEBUG_FAILURE(navi_ctx, NULL, "Can't parse multicast_tx_group\n");
         return -1;
         break;
     }
@@ -410,7 +410,7 @@ int navi_transport_start_multicast_on_addr(struct navi_protocol_ctx_s *navi_ctx,
 
   navi_ctx->mcast.mcast_socket=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (navi_ctx->mcast.mcast_socket<0) {
-    DEBUG_FAILURE(navi_ctx, "Can't create mcast data socket, error %s\n",strerror(errno));
+    DEBUG_FAILURE(navi_ctx, NULL, "Can't create mcast data socket, error %s\n",strerror(errno));
     navi_ctx->mcast.mcast_socket=0;
     return -1;
   }
@@ -448,7 +448,7 @@ int navi_transport_start_multicast_on_addr(struct navi_protocol_ctx_s *navi_ctx,
     }
   }
 
-  DEBUG_printf("%p: bind mcast tx to %s:%d\n",navi_ctx,inet_ntoa(navi_ctx->mcast.group_addr.sin_addr),ntohs(navi_ctx->mcast.group_addr.sin_port));
+  DEBUG_printf(navi_ctx,NULL,"bind mcast tx to %s:%d\n",inet_ntoa(navi_ctx->mcast.group_addr.sin_addr),ntohs(navi_ctx->mcast.group_addr.sin_port));
 
   if (bind(navi_ctx->mcast.mcast_socket, (struct sockaddr *)&navi_ctx->mcast.group_addr, sizeof(navi_ctx->mcast.group_addr))<0) {
     DEBUG_FAILURE_A("Can't bind mcast data socket, error %s\n",strerror(errno));
