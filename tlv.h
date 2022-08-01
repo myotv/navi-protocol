@@ -18,8 +18,8 @@
   _dict \
 }
 
-#define TLV_ENCODER(_name, _type) int _name(va_list ap, uint8_t *dst, void *user_ctx) { \
-  _type value=va_arg(ap, _type); \
+#define TLV_ENCODER(_name, _type) int _name(va_list* ap, uint8_t *dst, void *user_ctx) { \
+  _type value=va_arg(*ap, _type); \
   if (dst) memcpy(dst, &value, sizeof(_type)); \
   return sizeof(_type); \
 }
@@ -87,7 +87,7 @@
 
 typedef struct tlv_dictionary_element_s {
   TLV_KEY_TYPE type;
-  int (*encode)(va_list ap, uint8_t *dst, void *user_ctx);
+  int (*encode)(va_list* ap, uint8_t *dst, void *user_ctx);
   int (*encode_array)(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
   int (*decode)(uint8_t *src, const int src_len, void *dst, void *user_ctx);
   int (*decode_array)(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
@@ -96,26 +96,26 @@ typedef struct tlv_dictionary_element_s {
 int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struct tlv_dictionary_element_s *dictionary, void *user_ctx, ...);
 int tlv_decode(struct navi_protocol_ctx_s *navi_ctx, void *src_data, const int src_len, const struct tlv_dictionary_element_s *dictionary, void *user_ctx, ...);
 
-int encode_strz(va_list ap, uint8_t *dst, void *user_ctx);
+int encode_strz(va_list* ap, uint8_t *dst, void *user_ctx);
 int decode_strz(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_strz_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 
-int encode_u8(va_list ap, uint8_t *dst, void *user_ctx);
+int encode_u8(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_u8_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_u8(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_u8_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 
-int encode_u16(va_list ap, uint8_t *dst, void *user_ctx);
+int encode_u16(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_u16_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_u16(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_u16_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 
-int encode_u32(va_list ap, uint8_t *dst, void *user_ctx);
+int encode_u32(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_u32_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_u32(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_u32_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 
-int encode_double(va_list ap, uint8_t *dst, void *user_ctx);
+int encode_double(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_double_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_double(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_double_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);

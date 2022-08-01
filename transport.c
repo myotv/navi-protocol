@@ -168,8 +168,11 @@ int encode_stream(va_list ap, uint8_t *dst, void *user_ctx) {
         DICT_STREAM_MSS, stream->desc.stream_mss,
         TLV_END
       );
-    case NAVI_STREAM_DATA:
-      return -1;
+      case NAVI_STREAM_NULL:
+      case NAVI_STREAM_NETWORK_L2:
+      case NAVI_STREAM_NETWORK_L3:
+      case NAVI_STREAM_DATA:
+        return -1;
   }
   return -1;  
 }
@@ -844,9 +847,12 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           memset(pkt_fragment->data, 0, stream_ctx->desc.stream_mss+NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN));
 
           if (fec_packet->head.flags&NAVI_DATA_FLAG_ENCRYPTED_DATA) {
+#if NAVI_WITH_MULTICAST==1
             if (rx_packet->mcast_src) {
               fec_packet->decrypted_data=navi_decrypt_with_mcast_secret(navi_ctx, fec_packet->data, fec_packet->data_len, &fec_packet->decrypted_data_len);
-            } else {
+            } else
+#endif
+            {
               fec_packet->decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, fec_packet->data, fec_packet->data_len, &fec_packet->decrypted_data_len);
             }
             if (!fec_packet->decrypted_data) {
@@ -893,9 +899,12 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
                 uint8_t *f_data;
                 int f_payload_len;
                 if (ptr==0 && f->head.flags&NAVI_DATA_FLAG_ENCRYPTED_DATA && !f->decrypted_data) {
+#if NAVI_WITH_MULTICAST==1
                   if (rx_packet->mcast_src) {
                     f->decrypted_data=navi_decrypt_with_mcast_secret(navi_ctx, f->data, f->data_len, &f->decrypted_data_len);
-                  } else {
+                  } else
+#endif
+                  {
                     f->decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, f->data, f->data_len, &f->decrypted_data_len);
                   }
                   if (!f->decrypted_data) {
@@ -961,9 +970,12 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           uint8_t *decrypted_data=pkt->decrypted_data;
 
           if (!decrypted_data) {
+#if NAVI_WITH_MULTICAST==1
             if (rx_packet->mcast_src) {
               decrypted_data=navi_decrypt_with_mcast_secret(navi_ctx, pkt->data, pkt->data_len, &decrypted_len);
-            } else {
+            } else
+#endif
+            {
               decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, pkt->data, pkt->data_len, &decrypted_len);
             }
           }
@@ -2248,6 +2260,7 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
     }
     //DEBUG_printf(navi_ctx,NULL,"********** work state %d\n",state0);
     switch (navi_get_protocol_state(navi_ctx)) {
+      case NAVI_STATE_NOREPORT:
       case NAVI_STATE_INIT: return 0;
       case NAVI_STATE_ICE: res=navi_transport_work_ICE(navi_ctx, now_dt); break;
       case NAVI_STATE_DH_GENERATE: res=navi_transport_work_DH_GENERATE(navi_ctx); break;
@@ -2590,6 +2603,8 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
                 net_send_bytes+=encrypted_len+sizeof(struct NaviProtocolFrameHeader);
               }
             }
+
+#if NAVI_WITH_MULTICAST==1
             if (send_via_mcast) {
               if (!navi_encrypt_with_mcast_secret(navi_ctx, fec_head, navi_ctx->mss, &encrypted_len, encrypted_data)) {
                 DEBUG_FAILURE(navi_ctx,stream_ctx,"Can't encrypt data header stream %p\n",stream_ctx);
@@ -2603,6 +2618,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
                 net_send_bytes+=encrypted_len+sizeof(struct NaviProtocolFrameHeader);
               }
             }
+#endif
             break;
         }
       }

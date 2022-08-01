@@ -58,7 +58,7 @@ int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struc
         struct tlv_header_s *H=(struct tlv_header_s *)dst_ptr;
         int encode_size;
         if (!is_array) {
-          encode_size=dictionary[type].encode(ap, H->data, user_ctx);
+          encode_size=dictionary[type].encode(&ap, H->data, user_ctx);
         } else {
           if (!dictionary[type].encode_array) {
             DEBUG_FAILURE(navi_ctx, NULL, "no array encoder for arg %d\n",arg);
@@ -84,7 +84,7 @@ int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struc
       for (int idx=0; idx<repeat_count; ++idx) {
         int encode_size;
         if (!is_array) {
-          encode_size=dictionary[type].encode(ap, NULL, user_ctx);
+          encode_size=dictionary[type].encode(&ap, NULL, user_ctx);
         } else {
           if (!dictionary[type].encode_array) {
             DEBUG_FAILURE(navi_ctx, NULL, "no array encoder for arg %d\n",arg);
@@ -182,8 +182,8 @@ int tlv_decode(struct navi_protocol_ctx_s *navi_ctx, void *src_data, const int s
   return res;
 }
 
-int encode_strz(va_list ap, uint8_t *dst, void *user_ctx) {
-  char *str=va_arg(ap, char *);
+int encode_strz(va_list* ap, uint8_t *dst, void *user_ctx) {
+  char *str=va_arg(*ap, char *);
   if (!str) return 0;
   else {
     size_t len=strlen(str);
@@ -225,8 +225,8 @@ TLV_ARRAY_ENCODER(encode_double_arr, double);
 TLV_DECODER(decode_double, double);
 TLV_ARRAY_DECODER(decode_double_arr, double);
 
-int encode_u8(va_list ap, uint8_t *dst, void *user_ctx) { 
-  uint8_t value=va_arg(ap, int); 
+int encode_u8(va_list* ap, uint8_t *dst, void *user_ctx) {
+  uint8_t value=va_arg(*ap, int);
   if (dst) dst[0]=value;
   return sizeof(uint8_t); 
 }
@@ -252,8 +252,8 @@ int decode_u8_arr(uint8_t *src, const int src_len, void *dst, const int idx, voi
   return sizeof(uint8_t);
 }
 
-int encode_u16(va_list ap, uint8_t *dst, void *user_ctx) { 
-  uint16_t value=va_arg(ap, int); 
+int encode_u16(va_list* ap, uint8_t *dst, void *user_ctx) {
+  uint16_t value=va_arg(*ap, int);
   if (dst) *((uint16_t*)dst)=htobe16(value);
   return sizeof(uint16_t); 
 }
@@ -279,8 +279,8 @@ int decode_u16_array(uint8_t *src, const int src_len, void *dst, const int idx, 
   return sizeof(uint16_t);
 }
 
-int encode_u32(va_list ap, uint8_t *dst, void *user_ctx) { 
-  uint32_t value=va_arg(ap, uint32_t); 
+int encode_u32(va_list* ap, uint8_t *dst, void *user_ctx) {
+  uint32_t value=va_arg(*ap, uint32_t);
   if (dst) *((uint32_t*)dst)=htobe32(value);
   return sizeof(uint32_t); 
 }
