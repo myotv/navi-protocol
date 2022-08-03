@@ -85,7 +85,7 @@ TLV_MAKE_DICT(signalling_data_dict,
   TLV_DICT(DICT_CLIENT_STATE, encode_u8, NULL, decode_u8, NULL)  // state flag
 );
 
-static int encode_stream(va_list ap, uint8_t *dst, void *user_ctx);
+static int encode_stream(va_list *ap, uint8_t *dst, void *user_ctx);
 static int encode_stream_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 static int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 static int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ctx); // dst here pointer to struct navi_protocol_stream_list_s *
@@ -125,8 +125,8 @@ TLV_MAKE_DICT(stream_data_dict,
 );
 
 static
-int encode_stream(va_list ap, uint8_t *dst, void *user_ctx) {
-  struct navi_stream_ctx_s *stream=va_arg(ap, struct navi_stream_ctx_s *);
+int encode_stream(va_list *ap, uint8_t *dst, void *user_ctx) {
+  struct navi_stream_ctx_s *stream=va_arg(*ap, struct navi_stream_ctx_s *);
   switch (stream->desc.stream_type) {
     case NAVI_STREAM_VIDEO:
       return tlv_encode(
@@ -181,7 +181,7 @@ static
 int encode_stream_va(uint8_t *dst, void *user_ctx, ...) {
   va_list ap;
   va_start(ap, user_ctx);
-  return encode_stream(ap, dst, user_ctx);
+  return encode_stream(&ap, dst, user_ctx);
 }
 
 static
@@ -1329,7 +1329,16 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
     return;
   }
 
-  DEBUG_printf(navi_ctx,NULL,"RX data %p %lu state %d agent %p %d head type %04x %s stream %08x\n",data,size,navi_get_protocol_state(navi_ctx),agent,juice_get_state(agent),be16toh(head->frameType),frame_type_to_string(head->frameType),be32toh(head->streamId));
+  DEBUG_printf(
+    navi_ctx,NULL,
+    "RX data %p %lu state %d agent %p %d head type %04x %s stream %08x\n",
+    data,size,
+    navi_get_protocol_state(navi_ctx),
+    agent,juice_get_state(agent),
+    be16toh(head->frameType),
+    frame_type_to_string(head->frameType),
+    be32toh(head->streamId)
+  );
   //DEBUG_hexdump(data,size);
 
   if (!navi_check_rx_frame_size(size,head)) {
@@ -2396,9 +2405,6 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
     fec_head=NULL;
   }
 
-  uint8_t fec_start[32]={0};
-  int fec_start_ptr=0;
-
   while (packet_size>0) {
     int subframe_len=MIN(navi_ctx->mss, packet_size);
     int frame_encryption=stream_ctx->desc.encryption;
@@ -2571,7 +2577,6 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
 
     if (fec_data) {
       const int fec_group_id=frame_idx/fec_id_divisor;
-      fec_start[fec_start_ptr++]=data_ptr[0];
       for (int i=0; i<subframe_len; ++i) {
         fec_data[i]^=data_ptr[i];
       }
