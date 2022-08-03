@@ -1,21 +1,27 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "utils.h"
+
+#include "libnavi.h"
 
 void _navi_hexdump(const void *p, size_t len, const char *file, const int line) {
   const char *d=p;
   unsigned long i;
-  printf("\n%s:%d\n",file,line);
+  char buffer[16*3+32];
+  int bptr=0;
+  DEBUG_printf_a("%s:%d\n",file,line);
   for (i=0; i<len; ++i) {
-    if (i>0 && i%16==0) {
-      putchar('\n');
+    if (i%16==0) {
+      if (i>0) DEBUG_printf_a("%s\n",buffer);
+      bptr=sprintf(buffer,"%08lx ",i);
     }
-    printf("%02x ",*d);
+    bptr+=sprintf(buffer+bptr,"%02x ",*d);
     d++;
   }
-  puts("\n\n"); fflush(stdout);
+  DEBUG_printf_a("%s\n",buffer);
 }
 
 void navi_hexstr(char *outbuf, const void *src, const size_t len) {
