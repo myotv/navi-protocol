@@ -369,7 +369,10 @@ void navi_get_stream_remote_counters(struct navi_stream_ctx_s *stream_ctx, void 
 static 
 int default_logger_func(const enum navi_loglevel_e loglevel, const struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream_ctx, void *user_arg, const char *format, ...) {
   if (loglevel>navi_loglevel) return 0;
-  printf("NAVI:%p:%p|",navi_ctx,stream_ctx);
+  if (!navi_ctx && !stream_ctx) printf("NAVI|");
+  else if (!navi_ctx && stream_ctx) printf("NAVI:NULL:%p|",stream_ctx);
+  else if (navi_ctx && !stream_ctx) printf("NAVI:%p|",navi_ctx);
+  else printf("NAVI:%p:%p|",navi_ctx,stream_ctx);
   va_list ap;
   va_start(ap, format);
   const int res=vprintf(format, ap);
