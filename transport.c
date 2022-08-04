@@ -781,6 +781,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
       if (!rx_packet->fragments[i]) ++lost_packets;
       else packet_len+=rx_packet->fragments[i]->payload_len;
     }
+    DEBUG_printf(navi_ctx,stream_ctx,"count lost packets %d of %d\n",lost_packets,rx_packet->fragment_count);
 
     if (lost_packets) {
       const int max_fec_id=(rx_packet->fragment_count/stream_ctx->desc.fec_level)+1;
@@ -800,6 +801,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
         const int fec_group_id=be16toh(p->head.frame_idx);
         if (fec_group_id>max_fec_id) continue;
         fec_list[fec_group_id]=p;
+        DEBUG_printf(navi_ctx,stream_ctx,"fec list %d %p\n",fec_group_id,p);
       }
       for (int i=0; i<rx_packet->fragment_count; ++i) {
         if (!rx_packet->fragments[i]) {
@@ -809,6 +811,8 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           struct navi_rx_packet_fragment_s *src_fragment; // where to get head
           uint8_t *fec_bytes;
           uint8_t *recover_bytes;
+
+          DEBUG_printf(navi_ctx,stream_ctx,"no fragment %d fec group %d fec data %p\n",i,fec_group_id,fec_packet);
           
           if (!fec_packet) {
             DEBUG_FAILURE(navi_ctx,stream_ctx,"no fec frame, group %d\n",fec_group_id);
@@ -834,6 +838,9 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
             }
           }
           navi_inc_perfcounter(&stream_ctx->counters.rx_recover_count);
+
+          DEBUG_printf(navi_ctx,stream_ctx,"recover fragment %d fec group %d fec data %p\n",i,fec_group_id,fec_packet);
+
           pkt_fragment=malloc(sizeof(struct navi_rx_packet_fragment_s)+stream_ctx->desc.stream_mss+NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN));
           pkt_fragment->fec=fec_packet;
           pkt_fragment->head=src_fragment->head;
@@ -953,6 +960,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
       }
       lost_packets=0;
     } 
+    DEBUG_printf(navi_ctx,stream_ctx,"Lost packets %d\n",lost_packets);
     if (!lost_packets) {
       struct navi_received_frame_s *rx_frame=malloc(sizeof(struct navi_received_frame_s)+rx_packet->packet_size);
       uint8_t *rx_packet_data=rx_frame->data.data;
@@ -1083,7 +1091,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
           navi_ctx->events.rx_data_event(navi_ctx, stream_ctx, rx_frame->data.pts, rx_frame->data.dts, rx_frame->data.flags, navi_ctx->events.rx_data_event_data);
         }
       } else {
-        DEBUG_printf(navi_ctx,stream_ctx,"decrypt error\n");
+        DEBUG_printf(navi_ctx,stream_ctx,"decrypt error in proced_rx_queue_packet\n");
         FREEP(rx_frame);
       }
       if (rx_packet->fragments) {
@@ -1107,6 +1115,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
         }
         stream_ctx->rx_queue[stream_ctx->desc.rx_queue_length-1]=NULL;
         ++stream_ctx->rx_queue_head;
+        DEBUG_printf(navi_ctx,stream_ctx,"-- head now %u (remove first)\n",stream_ctx->rx_queue_head);
         FREEP(rx_packet->debug_data);
         FREEP(rx_packet);
         free_packet_later=false;
@@ -1182,7 +1191,10 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
   //DEBUG_hexdump(fragment_head, sizeof(struct NaviProtocolDataFrameHeader));
 
   if (rx_packet_id<stream_ctx->rx_queue_head) {
-    if ((stream_ctx->rx_queue_head-rx_packet_id)==1) return;
+    if ((stream_ctx->rx_queue_head-rx_packet_id)==1) {
+      DEBUG_printf(navi_ctx,stream_ctx,"duplicate last: head %u rx %u\n",stream_ctx->rx_queue_head,rx_packet_id);
+      return;
+    }
     DEBUG_FAILURE(navi_ctx,stream_ctx, "rx packet id %08x less than head %08x\n",rx_packet_id,stream_ctx->rx_queue_head);
     return;
   }
@@ -1207,6 +1219,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
     proced_rx_queue(navi_ctx, stream_ctx, 1);
     DEBUG_printf(navi_ctx,stream_ctx,"-- outoforder packet %u head %u max %u\n",rx_packet_id,stream_ctx->rx_queue_head,stream_ctx->rx_queue_head+stream_ctx->desc.rx_queue_length);
     stream_ctx->rx_queue_head=rx_packet_id;
+    DEBUG_printf(navi_ctx,stream_ctx,"-- head now %u\n",rx_packet_id);
   }
   DEBUG_printf(navi_ctx,stream_ctx,"-- get packet %d from qlist %p head %d idx %d flags %d\n",rx_packet_id,stream_ctx->rx_queue,stream_ctx->rx_queue_head,rx_packet_id-stream_ctx->rx_queue_head,fragment_head->flags);
   rx_packet=stream_ctx->rx_queue[rx_packet_id-stream_ctx->rx_queue_head];
@@ -1287,6 +1300,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
   if (fragment_head->flags&NAVI_DATA_FLAG_FEC_FRAME) {
     pkt_fragment->next=rx_packet->fec_packets;
     rx_packet->fec_packets=pkt_fragment;
+    DEBUG_printf(navi_ctx,stream_ctx,"*** fragment %p enqueue as fec\n",pkt_fragment);
     pkt_fragment=NULL; // mark it enqueued
   } else {
     if (fragment_idx<rx_packet->fragment_count) {
@@ -2576,7 +2590,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
     }
 
     if (fec_data) {
-      const int fec_group_id=frame_idx/fec_id_divisor;
+      const int fec_group_id=(frame_idx/fec_id_divisor)-1; // группа считается с 0, а тут frame_idx уже "следующий"
       for (int i=0; i<subframe_len; ++i) {
         fec_data[i]^=data_ptr[i];
       }
