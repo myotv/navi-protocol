@@ -215,7 +215,7 @@ extern void *navi_logger_func_arg;
   void *arg=navi_logger_func_arg; \
   pthread_spin_unlock(&navi_logger_lock); \
   if (fn) { \
-    fn(LL_NAVI_DEBUG, navi_ctx, stream_ctx, navi_logger_func_arg, "fail at %s:%d ", __FILE__, __LINE__); \
+    fn(LL_NAVI_DEBUG, navi_ctx, stream_ctx, navi_logger_func_arg, "fail at %s:%d\n", __FILE__, __LINE__); \
     fn(LL_NAVI_DEBUG, navi_ctx, stream_ctx, navi_logger_func_arg, format); \
   } \
 } while (0)
@@ -225,7 +225,7 @@ extern void *navi_logger_func_arg;
   void *arg=navi_logger_func_arg; \
   pthread_spin_unlock(&navi_logger_lock); \
   if (fn) { \
-    fn(LL_NAVI_DEBUG, NULL, NULL, navi_logger_func_arg, "fail at %s:%d ", __FILE__, __LINE__); \
+    fn(LL_NAVI_DEBUG, NULL, NULL, navi_logger_func_arg, "fail at %s:%d\n", __FILE__, __LINE__); \
     fn(LL_NAVI_DEBUG, NULL, NULL, navi_logger_func_arg, format); \
   } \
 } while (0)
