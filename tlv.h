@@ -115,6 +115,11 @@ int encode_u32_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_u32(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_u32_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 
+int encode_u64(va_list* ap, uint8_t *dst, void *user_ctx);
+int encode_u64_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
+int decode_u64(uint8_t *src, const int src_len, void *dst, void *user_ctx);
+int decode_u64_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
+
 int encode_double(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_double_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_double(uint8_t *src, const int src_len, void *dst, void *user_ctx);
