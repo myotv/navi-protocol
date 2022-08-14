@@ -375,6 +375,11 @@ int default_logger_func(const enum navi_loglevel_e loglevel, const struct navi_p
   else printf("NAVI:%p:%p|",navi_ctx,stream_ctx);
   va_list ap;
   va_start(ap, format);
+  if (memcmp(format,"%s",3)==0) {
+    char *s=va_arg(ap, char *);
+    va_end(ap);
+    return fputs(s, stdout);
+  }
   const int res=vprintf(format, ap);
   va_end(ap);
   return res;
