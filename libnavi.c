@@ -13,6 +13,8 @@
 
 #include <openssl/md5.h>
 
+#include <juice/juice.h>
+
 #include "libnavi.h"
 #include "transport.h"
 #include "utils.h"
@@ -394,6 +396,43 @@ navi_logger_t navi_set_logger(navi_logger_t func, void *user_arg) {
   return old_logger;
 }
 
+#ifdef NAVI_HANDLE_JIUCE_OUTPUT
+static
+void juice_log_handler(juice_log_level_t level, const char *message) {
+  if (level==JUICE_LOG_LEVEL_NONE) return;
+
+  enum navi_loglevel_e ll;
+  switch (level) {
+    case JUICE_LOG_LEVEL_VERBOSE: ll=LL_NAVI_TRACE; break;
+    case JUICE_LOG_LEVEL_DEBUG: ll=LL_NAVI_DEBUG; break;
+    case JUICE_LOG_LEVEL_INFO: ll=LL_NAVI_INFO; break;
+    case JUICE_LOG_LEVEL_WARN: ll=LL_NAVI_INFO; break;
+    case JUICE_LOG_LEVEL_ERROR: ll=LL_NAVI_ERROR; break;
+    case JUICE_LOG_LEVEL_FATAL: ll=LL_NAVI_CRITICAL; break;
+    case JUICE_LOG_LEVEL_NONE: ll=LL_NAVI_NONE; break;  
+    default: ll=LL_NAVI_NONE; break;  
+  }
+  NAVI_LOG(ll,NULL,NULL,"%s",message);
+}
+#endif
+
+enum navi_loglevel_e navi_set_loglevel(enum navi_loglevel_e ll) {
+  navi_loglevel=ll;
+#ifdef NAVI_HANDLE_JIUCE_OUTPUT
+  juice_log_level_t jl;
+  switch (ll) {
+    case LL_NAVI_NONE: jl=JUICE_LOG_LEVEL_NONE; break;
+    case LL_NAVI_CRITICAL: jl=JUICE_LOG_LEVEL_FATAL; break;
+    case LL_NAVI_ERROR: jl=JUICE_LOG_LEVEL_ERROR; break;
+    case LL_NAVI_INFO: jl=JUICE_LOG_LEVEL_INFO; break;
+    case LL_NAVI_DEBUG: jl=JUICE_LOG_LEVEL_DEBUG; break;
+    case LL_NAVI_TRACE: jl=JUICE_LOG_LEVEL_VERBOSE; break;
+    default: jl=JUICE_LOG_LEVEL_NONE; break;
+  }
+  juice_set_log_level(jl);
+#endif
+}
+
 #if NAVI_ALLOW_CONSTRUCTOR_INIT
 void __attribute__((constructor)) navi_library_init(void) 
 #else
@@ -405,6 +444,9 @@ void navi_library_init(void)
   navi_is_initialized=true;
 
   pthread_spin_init(&navi_logger_lock, PTHREAD_PROCESS_PRIVATE);
+#ifdef NAVI_HANDLE_JIUCE_OUTPUT
+  juice_set_log_handler(juice_log_handler);
+#endif  
 }
 
 

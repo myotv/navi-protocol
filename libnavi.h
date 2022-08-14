@@ -145,6 +145,8 @@ typedef int (*navi_logger_t)(const enum navi_loglevel_e level,
 
 void navi_library_init(void);
 
+enum navi_loglevel_e navi_set_loglevel(enum navi_loglevel_e ll);
+
 struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, struct navi_events_s *events);
 void navi_free_context(struct navi_protocol_ctx_s *navi_ctx);
 struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_desc_s *stream_desc);

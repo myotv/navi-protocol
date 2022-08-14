@@ -14,4 +14,8 @@
 #define NAVI_WITH_MULTICAST 1
 #endif
 
+#ifndef NAVI_HANDLE_JIUCE_OUTPUT
+#define NAVI_HANDLE_JIUCE_OUTPUT 1
+#endif
+
 #endif
