@@ -286,7 +286,7 @@ int encode_u32(va_list* ap, uint8_t *dst, void *user_ctx) {
 }
 
 int encode_u32_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx) { 
-  uint16_t value=((uint32_t *)ptr)[idx];
+  uint32_t value=((uint32_t *)ptr)[idx];
   if (dst) *((uint32_t*)dst)=htobe32(value);
   return sizeof(uint32_t); 
 }
