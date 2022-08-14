@@ -305,3 +305,30 @@ int decode_u32_array(uint8_t *src, const int src_len, void *dst, const int idx, 
   }
   return sizeof(uint32_t);
 }
+
+int encode_u64(va_list* ap, uint8_t *dst, void *user_ctx) {
+  uint64_t value=va_arg(*ap, uint64_t);
+  if (dst) *((uint64_t*)dst)=htobe64(value);
+  return sizeof(uint64_t); 
+}
+
+int encode_u64_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx) { 
+  uint64_t value=((uint64_t *)ptr)[idx];
+  if (dst) *((uint64_t*)dst)=htobe64(value);
+  return sizeof(uint64_t); 
+}
+
+int decode_u64(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
+  if (src_len!=sizeof(uint64_t)) return -1; 
+  if (dst) *((uint64_t*)dst)=be64toh(*(uint64_t *)src);
+  return sizeof(uint64_t);
+}
+
+int decode_u64_array(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx) {
+  if (src_len!=sizeof(uint64_t)) return -1; 
+  if (dst) {
+    uint64_t *dst_u64=(uint64_t *)dst;
+    dst_u64[idx]=be64toh(*(uint64_t *)src);
+  }
+  return sizeof(uint64_t);
+}
