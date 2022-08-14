@@ -11,6 +11,7 @@
 #define NAVI_OFFER_RESEND 2000
 
 #define NAVI_MCAST_ANNOUNCE_PERIOD 2000
+#define NAVI_MCAST_REPORT_PERIOD 2000
 
 struct navi_rx_packet_fragment_s {
   struct navi_rx_packet_fragment_s *next;
@@ -39,6 +40,14 @@ struct navi_rx_packet_s {
 struct navi_received_frame_s {
   struct navi_received_frame_s *next;
   struct navi_received_frame_data_s data;
+};
+
+struct navi_stream_report_s {
+  uint64_t report_time;
+  uint32_t stream_id;
+  uint64_t rx_bytes;
+  uint32_t rx_packets;
+  uint32_t rx_packets_lost;
 };
 
 struct navi_stream_ctx_s {
@@ -79,6 +88,8 @@ struct navi_stream_ctx_s {
     struct {
       navi_perfcounter net_tx_rate;
     } counters;
+    struct navi_stream_report_s remote_report;
+    bool report_rx_timeout;
   } mcast;
 };
 
@@ -130,6 +141,7 @@ struct navi_protocol_ctx_s {
   uint64_t signalling_rx_time;
   struct {
     bool enable;
+    bool ondemand_enable;
     void *encrypt_ctx;
     void *decrypt_ctx;
     uint8_t encryption_key[16]; // 16 - for aes128
@@ -148,6 +160,11 @@ struct navi_protocol_ctx_s {
       navi_perfcounter rx_rate;
       navi_perfcounter tx_rate;
     } counters;
+    int mcast_report_recv_socket;
+    uint64_t report_tx_time;
+    bool send_reports;
+    bool receive_reports;
+    uint64_t report_membership_check;
   } mcast;
   struct {
     navi_perfcounter signalling_tx;

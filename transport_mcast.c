@@ -1,12 +1,17 @@
 static char *discovery_group_addr="224.0.0.100";
+static char *report_group_addr="224.0.0.100";
 static bool discovery_group_addr_set=false;
+static bool report_group_addr_set=false;
 static int mcast_discovery_fd=0;
+static int mcast_report_send_fd=0;
 static struct sockaddr_in mcast_announce_addr;
+static struct sockaddr_in mcast_report_addr;
 
 #define NAVI_MCAST_BUFFER_SIZE 1500
 #define NAVI_MCAST_MEMBERSHIP_TIMEOUT 2000
 
 static void navi_start_mcast_receive(struct navi_protocol_ctx_s *navi_ctx, const struct in_addr group_addr, const int udp_port, struct navi_protocol_stream_list_s *streams);
+static void navi_send_mcast_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_t now_dt);
 
 static inline
 bool navi_mcast_available(struct navi_protocol_ctx_s *navi_ctx) {
@@ -25,6 +30,21 @@ void navi_transport_set_discovery_group(const char *group_addr) {
   if (mcast_discovery_fd && !discovery_group_addr) {
     close(mcast_discovery_fd);
     mcast_discovery_fd=0;
+  }
+}
+
+void navi_transport_set_report_group(const char *group_addr) {
+  if (report_group_addr && group_addr && !strcmp(report_group_addr,group_addr)) return;
+  
+  if (report_group_addr_set) free(report_group_addr);
+  report_group_addr_set=true;
+
+  if (group_addr) report_group_addr=strdup(group_addr);
+  else report_group_addr=NULL;
+
+  if (mcast_report_send_fd && !report_group_addr) {
+    close(mcast_report_send_fd);
+    mcast_report_send_fd=0;
   }
 }
 
@@ -601,4 +621,329 @@ void navi_start_mcast_receive(struct navi_protocol_ctx_s *navi_ctx, const struct
     }
     navi_ctx->events.rx_stream_event(navi_ctx, NULL, 0, NULL, navi_ctx->events.rx_stream_event_data);
   }
+}
+
+int navi_start_mcast_report_sending(void) {
+  struct ip_mreqn mreq;
+  
+  if (mcast_report_send_fd) return 0;
+
+  mcast_report_send_fd=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (mcast_report_send_fd<0) {
+    mcast_report_send_fd=0;
+    DEBUG_FAILURE_A("Can't create multicast socket, error %s",strerror(errno));
+    return -1;
+  }
+
+  static const int yes=1;
+  if (setsockopt(mcast_report_send_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))<0) {
+    DEBUG_FAILURE_A("Can't set SO_REUSEADDR, error %s",strerror(errno));
+    close(mcast_report_send_fd);
+    mcast_report_send_fd=0;
+    return -1;
+  }
+
+  mcast_report_addr.sin_family=AF_INET;
+  mcast_report_addr.sin_port=htons(NAVI_MULTICAST_REPORT_PORT);
+  mcast_report_addr.sin_addr.s_addr=inet_addr(report_group_addr);
+
+  if (bind(mcast_report_send_fd, (struct sockaddr *)&mcast_report_addr, sizeof(mcast_report_addr))<0) {
+    DEBUG_FAILURE_A("Can't bind report addr, error %s",strerror(errno));
+    close(mcast_report_send_fd);
+    mcast_report_send_fd=0;
+    return -1;
+  }
+
+  mreq.imr_multiaddr=mcast_report_addr.sin_addr;
+  mreq.imr_address.s_addr=htonl(INADDR_ANY);
+  mreq.imr_ifindex=0;
+
+  // ignore result
+  setsockopt(mcast_report_send_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+
+  DEBUG_printf_a("multicast report fd %d\n",mcast_report_send_fd);
+
+  return 0;
+}
+
+static
+void navi_send_mcast_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_t now_dt) {
+  uint8_t *buffer;
+  int data_len;
+  struct navi_stream_ctx_s **streams;
+  int ptr;
+  int res;
+  uint16_t *crc_ptr;
+  void *report_packet;
+  int report_packet_len;
+
+  if (!mcast_report_send_fd) return;
+
+  if ((now_dt-navi_ctx->mcast.report_tx_time)<NAVI_MCAST_REPORT_PERIOD) return;
+  navi_ctx->mcast.report_tx_time=now_dt;
+
+  streams=(struct navi_stream_ctx_s **)alloca(sizeof(struct navi_stream_ctx_s *)*navi_ctx->rx_stream_count);
+  ptr=0;
+  for (struct navi_stream_ctx_s *s=navi_ctx->rx_streams; s; s=s->next) {
+    streams[ptr++]=s;
+  }
+
+  data_len=tlv_encode(
+    navi_ctx, 
+    NULL, 
+    multicast_report_dict, 
+    navi_ctx,
+    DICT_MCAST_REPORT_DOMAIN, navi_ctx->config.domain_name,
+    DICT_MCAST_REPORT_CLIENT_NAME, navi_ctx->config.client_name,
+    DICT_MCAST_REPORT_STREAM_COUNT, ptr,
+    TLV_ARRAY_OF(DICT_MCAST_REPORT_STREAMS, ptr), streams, 
+    TLV_END
+  );
+  if (data_len<0) {
+    DEBUG_FAILURE(navi_ctx, NULL, "can't seralize rx report\n");
+    return;
+  }
+
+  buffer=alloca(data_len+16);
+  data_len=tlv_encode(
+    navi_ctx, 
+    buffer, 
+    multicast_report_dict, 
+    navi_ctx,
+    DICT_MCAST_REPORT_DOMAIN, navi_ctx->config.domain_name,
+    DICT_MCAST_REPORT_CLIENT_NAME, navi_ctx->config.client_name,
+    DICT_MCAST_REPORT_STREAM_COUNT, ptr,
+    TLV_ARRAY_OF(DICT_MCAST_REPORT_STREAMS, ptr), streams, 
+    TLV_END
+  );
+  if (data_len<0) {
+    DEBUG_FAILURE(navi_ctx, NULL, "can't seralize rx report\n");
+    return;
+  }
+
+  crc_ptr=(uint16_t *)(buffer+data_len);
+  *crc_ptr=htobe16(crc16(buffer, 0xFFFF, data_len));
+  data_len+=sizeof(uint16_t);
+
+  report_packet=navi_encrypt_with_mcast_secret(navi_ctx, buffer, data_len, &report_packet_len, NULL);
+  if (!report_packet) {
+    DEBUG_FAILURE(navi_ctx, NULL, "can't encrypt mcast report\n");
+    return;
+  }
+
+  res=sendto(mcast_report_send_fd, report_packet, report_packet_len, MSG_DONTWAIT|MSG_NOSIGNAL, (struct sockaddr *)&mcast_report_addr, sizeof(mcast_report_addr));
+  free(report_packet);
+
+  DEBUG_printf(navi_ctx,NULL,"send mcast report %d\n",res);
+
+  if (res<0) {
+    DEBUG_FAILURE(navi_ctx, NULL, "can't send mcast report, error %s\n",strerror(errno));
+  } else
+  if (res<report_packet_len) {
+    DEBUG_FAILURE(navi_ctx, NULL, "mcast report: short send %d\n",res);
+  }
+
+}
+
+static int encode_stream_report(va_list *ap, uint8_t *dst, void *user_ctx) {
+  struct navi_stream_ctx_s *stream=va_arg(*ap, struct navi_stream_ctx_s *);
+  return tlv_encode(
+    user_ctx,
+    dst,
+    stream_report_dict,
+    NULL,
+    DICT_STREAM_REPORT_STREAM_ID, stream->stream_id,
+    DICT_STREAM_REPORT_RX_BYTES, navi_read_perfcounter_counter(&stream->counters.rx_bytes),
+    DICT_STREAM_REPORT_RX_PACKETS, navi_read_perfcounter_counter(&stream->counters.rx_packets),
+    DICT_STREAM_REPORT_RX_PACKETS_LOST, navi_read_perfcounter_counter(&stream->counters.rx_loss_count),
+    TLV_END
+  );
+}
+
+static
+int encode_stream_report_va(uint8_t *dst, void *user_ctx, ...) {
+  va_list ap;
+  va_start(ap, user_ctx);
+  return encode_stream_report(&ap, dst, user_ctx);
+}
+
+static int encode_stream_report_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx) {
+  struct navi_stream_ctx_s **stream=(struct navi_stream_ctx_s **)ptr;
+  return encode_stream_report_va(dst, user_ctx, stream[idx]);
+}
+
+static int decode_stream_report(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
+  int res;
+  struct navi_protocol_ctx_s *navi_ctx=(struct navi_protocol_ctx_s *)dst;
+  struct navi_stream_report_s report;
+
+  memset(&report, 0, sizeof(struct navi_stream_report_s));
+
+  res=tlv_decode(
+    navi_ctx, 
+    src, src_len, 
+    stream_report_dict, 
+    NULL, 
+    DICT_STREAM_REPORT_STREAM_ID, &report.stream_id,
+    DICT_STREAM_REPORT_RX_BYTES, &report.rx_bytes,
+    DICT_STREAM_REPORT_RX_PACKETS, &report.rx_packets,
+    DICT_STREAM_REPORT_RX_PACKETS_LOST, &report.rx_packets_lost,
+    TLV_END
+  );
+
+  if (res>0) {
+    for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {
+      if (s->stream_id==report.stream_id) {
+        report.report_time=navi_current_time(navi_ctx);
+        s->mcast.remote_report=report;
+        break;
+      }
+    }
+  } else {
+    DEBUG_FAILURE(navi_ctx, NULL, "Can't decode mcast report, res %d\n",res);
+  }
+  return res;
+}
+
+int navi_transport_receive_multicast_report(struct navi_protocol_ctx_s *navi_ctx, const int enable) {
+  struct sockaddr_in report_A;
+  struct ip_mreqn mreq;
+
+  if (!enable && navi_ctx->mcast.mcast_report_recv_socket>0) {
+    close(navi_ctx->mcast.mcast_report_recv_socket);
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return 0;
+  }
+
+  navi_ctx->mcast.mcast_report_recv_socket=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (navi_ctx->mcast.mcast_report_recv_socket<0) {
+    DEBUG_FAILURE(navi_ctx, NULL, "Can't create mcast report socket, error %s\n",strerror(errno));
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return -1;
+  }
+
+  static const int yes=1;
+  if (setsockopt(navi_ctx->mcast.mcast_report_recv_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))<0) {
+    DEBUG_FAILURE_A("Can't set SO_REUSEADDR, error %s",strerror(errno));
+    close(navi_ctx->mcast.mcast_report_recv_socket);
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return -1;
+  }
+
+  static const int no=0;
+  if (setsockopt(navi_ctx->mcast.mcast_report_recv_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &no, sizeof (no))<0) {
+    DEBUG_FAILURE_A("Can't unset IP_MULTICAST_LOOP, error %s",strerror(errno));
+    close(navi_ctx->mcast.mcast_report_recv_socket);
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return -1;
+  }
+
+  report_A.sin_family=AF_INET;
+  report_A.sin_port=htons(NAVI_MULTICAST_REPORT_PORT);
+  report_A.sin_addr.s_addr=inet_addr(report_group_addr);
+
+  if (bind(navi_ctx->mcast.mcast_report_recv_socket, (struct sockaddr *)&report_A, sizeof(report_A))<0) {
+    DEBUG_FAILURE_A("Can't bind mcast report rx socket, error %s\n",strerror(errno));
+    close(navi_ctx->mcast.mcast_report_recv_socket);
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return -1;
+  }
+
+  mreq.imr_multiaddr=report_A.sin_addr;
+  mreq.imr_address.s_addr=htonl(INADDR_ANY);
+  mreq.imr_ifindex=0;
+
+  if (setsockopt(navi_ctx->mcast.mcast_report_recv_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq))<0) {
+    DEBUG_FAILURE_A("Can't join report group, error %s\n",strerror(errno));
+    close(navi_ctx->mcast.mcast_report_recv_socket);
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return -1;
+  }
+
+  return 0;    
+}
+
+void navi_mcast_check_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_t now_dt) {
+  uint8_t buffer[NAVI_MCAST_BUFFER_SIZE];
+
+  if (!navi_ctx->mcast.mcast_report_recv_socket) return;
+  if (navi_ctx->mcast.membership_check>now_dt) navi_ctx->mcast.membership_check=0;
+
+  if (now_dt-navi_ctx->mcast.report_membership_check>NAVI_MCAST_MEMBERSHIP_TIMEOUT) {
+    struct ip_mreq mreq;
+    navi_ctx->mcast.report_membership_check=now_dt;
+
+    mreq.imr_multiaddr.s_addr=inet_addr(report_group_addr);
+    mreq.imr_interface.s_addr=htonl(INADDR_ANY);
+
+    // don't care about result
+    setsockopt(navi_ctx->mcast.mcast_report_recv_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+  }
+
+   for(;;) {
+    ssize_t res;
+    struct sockaddr_in pkt_addr;
+    socklen_t pkt_addr_len=sizeof(pkt_addr);
+    uint8_t *decrypted_data;
+    int decrypted_len;
+    uint16_t *crc_ptr;
+    uint16_t rx_crc;
+    char *domain=NULL;
+    char *client_name=NULL;
+    uint8_t stream_count;
+    struct in_addr group_addr;
+    uint16_t udp_port;
+    struct navi_protocol_stream_list_s *streams=NULL;
+
+    res=recvfrom(navi_ctx->mcast.mcast_report_recv_socket, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr *)&pkt_addr, &pkt_addr_len);
+    if (res<(ssize_t)sizeof(navi_ctx->mcast.local_iv)) return;
+
+    // loopback check
+    if (memcmp(buffer, navi_ctx->mcast.local_iv, sizeof(navi_ctx->mcast.local_iv))==0) {
+      continue;
+    }
+
+    decrypted_data=(uint8_t*)navi_decrypt_with_mcast_secret(navi_ctx, buffer, res, &decrypted_len);
+    if (!decrypted_data) return;
+    if (decrypted_len<8) {
+      free((void *)decrypted_data);
+      continue;
+    }
+
+    //DEBUG_hexdump(decrypted_data, decrypted_len);
+
+    crc_ptr=(uint16_t *)(decrypted_data+decrypted_len-sizeof(uint16_t));
+    rx_crc=htobe16(crc16(decrypted_data, 0xFFFF, decrypted_len-sizeof(uint16_t)));
+    if (*crc_ptr!=rx_crc) {
+      DEBUG_FAILURE(navi_ctx, NULL, "bad mcast report crc\n");
+      free((void *)decrypted_data);
+      continue;
+    }
+
+    res=tlv_decode(
+      navi_ctx,
+      decrypted_data,
+      decrypted_len-sizeof(uint16_t),
+      multicast_report_dict,
+      navi_ctx,
+      DICT_MCAST_REPORT_DOMAIN, &domain,
+      DICT_MCAST_REPORT_CLIENT_NAME, &client_name,
+      DICT_MCAST_REPORT_STREAM_COUNT, &stream_count,
+      DICT_MCAST_REPORT_STREAMS, navi_ctx,
+      TLV_END
+    );
+
+    DEBUG_printf(navi_ctx,NULL,"mcast report: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
+
+    free(client_name);
+    free(domain);
+
+    free((void *)decrypted_data);
+  }
+}
+
+static 
+bool navi_mcast_can_send_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream_ctx) {
+  if (!navi_ctx->mcast.ondemand_enable) return true;
+  return !stream_ctx->mcast.report_rx_timeout;
 }

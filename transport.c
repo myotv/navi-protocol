@@ -56,6 +56,20 @@ enum {
 };
 
 enum {
+  DICT_MCAST_REPORT_DOMAIN=1,
+  DICT_MCAST_REPORT_CLIENT_NAME,
+  DICT_MCAST_REPORT_STREAM_COUNT,
+  DICT_MCAST_REPORT_STREAMS,
+};
+
+enum {
+  DICT_STREAM_REPORT_STREAM_ID=1,
+  DICT_STREAM_REPORT_RX_BYTES,
+  DICT_STREAM_REPORT_RX_PACKETS,
+  DICT_STREAM_REPORT_RX_PACKETS_LOST,
+};
+
+enum {
   DICT_ANOUNCE_STREAM_COUNT=1,
   DICT_ANOUNCE_STREAM=2,
 };
@@ -90,6 +104,10 @@ static int encode_stream_arr(void *ptr, const int idx, uint8_t *dst, void *user_
 static int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 static int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ctx); // dst here pointer to struct navi_protocol_stream_list_s *
 
+static int encode_stream_report(va_list *ap, uint8_t *dst, void *user_ctx);
+static int encode_stream_report_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
+static int decode_stream_report(uint8_t *src, const int src_len, void *dst, void *user_ctx);
+
 TLV_MAKE_DICT(protocol_data_dict,
   TLV_DICT(DICT_ANOUNCE_STREAM_COUNT, encode_u8, NULL, decode_u8, NULL), // stream count
   TLV_DICT(DICT_ANOUNCE_STREAM, encode_stream, encode_stream_arr, decode_stream, NULL), // stream data
@@ -103,6 +121,20 @@ TLV_MAKE_DICT(multicast_announce_dict,
   TLV_DICT(DICT_MCAST_GROUP, encode_u32, NULL, decode_u32, NULL), // mcast group
   TLV_DICT(DICT_MCAST_PORT, encode_u16, NULL, decode_u16, NULL), // port
   TLV_DICT(DICT_MCAST_STREAMS, encode_stream, encode_stream_arr, decode_stream_desc, NULL), // stream data
+);
+
+TLV_MAKE_DICT(multicast_report_dict,
+  TLV_DICT(DICT_MCAST_REPORT_DOMAIN, encode_strz, NULL, decode_strz, NULL), // domain name
+  TLV_DICT(DICT_MCAST_REPORT_CLIENT_NAME, encode_strz, NULL, decode_strz, NULL), // client name
+  TLV_DICT(DICT_MCAST_REPORT_STREAM_COUNT, encode_u8, NULL, decode_u8, NULL), // stream count
+  TLV_DICT(DICT_MCAST_REPORT_STREAMS, encode_stream_report, encode_stream_report_arr, decode_stream_report, NULL), // stream data
+);
+
+TLV_MAKE_DICT(stream_report_dict,
+  TLV_DICT(DICT_STREAM_REPORT_STREAM_ID, encode_u32, NULL, decode_u32, NULL),
+  TLV_DICT(DICT_STREAM_REPORT_RX_BYTES, encode_u64, NULL, decode_u64, NULL),
+  TLV_DICT(DICT_STREAM_REPORT_RX_PACKETS, encode_u32, NULL, decode_u32, NULL),
+  TLV_DICT(DICT_STREAM_REPORT_RX_PACKETS_LOST, encode_u32, NULL, decode_u32, NULL),
 );
 #endif
 
@@ -2261,6 +2293,24 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
       }
       navi_check_mcast_discovery(navi_ctx, now_dt);
       if (navi_ctx->tx_streams) navi_send_mcast_announce(navi_ctx, now_dt);
+
+      if (navi_mcast_available(navi_ctx) && now_dt) {
+        if (navi_ctx->mcast.send_reports && navi_ctx->rx_stream_count>0) {
+          navi_send_mcast_report(navi_ctx, now_dt);
+        }
+        if (navi_ctx->mcast.receive_reports && navi_ctx->tx_stream_count>0) {
+          navi_mcast_check_report(navi_ctx, now_dt);
+        }
+        if (navi_ctx->mcast.ondemand_enable) {
+          for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {
+            s->mcast.report_rx_timeout=(now_dt-s->mcast.remote_report.report_time)>(NAVI_MCAST_REPORT_PERIOD*2);
+          }
+        } else {
+          for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {
+            s->mcast.report_rx_timeout=false;
+          }
+        }
+      }
     }
     #endif
 
@@ -2331,14 +2381,14 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
   int net_send_bytes_mcast=0;
   const bool send_via_unicast=navi_get_protocol_state(navi_ctx)==NAVI_STATE_ONLINE;
 #if NAVI_WITH_MULTICAST==1
-  const bool send_via_mcast=navi_mcast_available(navi_ctx);
+  const bool send_via_mcast=navi_mcast_available(navi_ctx) && navi_mcast_can_send_stream(navi_ctx, stream_ctx);
 #else
   const bool send_via_mcast=false;
 #endif
 
   if (packet_size<0 || !packet_data) return -1;
 
-  if (!send_via_unicast && !send_via_mcast) return -1;
+  if (!send_via_unicast && !send_via_mcast) return 0;
 
   navi_add_perfcounter(&stream_ctx->counters.tx_codec_rate, packet_size);
 

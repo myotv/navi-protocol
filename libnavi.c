@@ -69,6 +69,9 @@ struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, st
   ctx->mss=1300;  // length without navi header 
 
   ctx->mcast.enable=config->multicast_enable;
+  ctx->mcast.ondemand_enable=config->multicast_ondemand;
+  ctx->mcast.send_reports=config->multicast_send_reports;
+  ctx->mcast.receive_reports=config->multicast_receive_reports;
 
   DEBUG_printf(ctx,NULL,"navi create state: %d\n",navi_protocol_state(ctx));
 

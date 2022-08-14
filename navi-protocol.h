@@ -9,6 +9,7 @@
 #define NAVI_INFO_STREAM 0x4e415649
 
 #define NAVI_MULTICAST_DISCOVERY_PORT 5000
+#define NAVI_MULTICAST_REPORT_PORT 5002
 
 struct NaviProtocolFrameHeader {
   uint16_t frameType;

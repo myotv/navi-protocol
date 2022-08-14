@@ -50,6 +50,9 @@ struct navi_config_s {
   int multicast_enable;
   char *multicast_secret;
   char *multicast_tx_group;
+  int multicast_ondemand;
+  int multicast_send_reports;
+  int multicast_receive_reports;
 };
 
 struct navi_stream_desc_s {
@@ -194,6 +197,9 @@ int navi_transport_start_multicast(struct navi_protocol_ctx_s *navi_ctx);
 int navi_transport_stop_multicast(struct navi_protocol_ctx_s *navi_ctx);
 
 int navi_transport_multicast_ready(struct navi_protocol_ctx_s *navi_ctx);
+
+int navi_start_mcast_report_sending(void);
+int navi_transport_receive_multicast_report(struct navi_protocol_ctx_s *navi_ctx, const int enable);
 
 navi_logger_t navi_set_logger(navi_logger_t func, void *user_arg);
 
