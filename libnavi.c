@@ -384,6 +384,11 @@ int default_logger_func(const enum navi_loglevel_e loglevel, const struct navi_p
     char *s=va_arg(ap, char *);
     va_end(ap);
     return fputs(s, stdout);
+  } else
+  if (memcmp(format,"%s\n",4)==0) {
+    char *s=va_arg(ap, char *);
+    va_end(ap);
+    return puts(s);
   }
   const int res=vprintf(format, ap);
   va_end(ap);
@@ -415,7 +420,7 @@ void juice_log_handler(juice_log_level_t level, const char *message) {
     case JUICE_LOG_LEVEL_NONE: ll=LL_NAVI_NONE; break;  
     default: ll=LL_NAVI_NONE; break;  
   }
-  NAVI_LOG(ll,NULL,NULL,"%s",message);
+  NAVI_LOG(ll,NULL,NULL,"%s\n",message);
 }
 #endif
 
