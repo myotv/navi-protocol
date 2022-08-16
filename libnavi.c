@@ -103,6 +103,10 @@ void navi_register_timesource(struct navi_protocol_ctx_s *navi_ctx, navi_timesou
 
 struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_desc_s *stream_desc) {
   struct navi_stream_ctx_s *stream=malloc(sizeof(struct navi_stream_ctx_s));
+  if (stream_desc->timebase.num<1 || stream_desc->timebase.den<1) {
+    NAVI_LOG(LL_NAVI_ERROR,navi_ctx,NULL,"Bad timebase for stream\n");
+    return NULL;
+  }
   stream->desc=*stream_desc;
   stream->stream_id=crc32(
     &stream_desc->bitrate, 

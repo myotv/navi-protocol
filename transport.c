@@ -90,6 +90,8 @@ enum {
   DICT_STREAM_RX_QUEUE_LENGTH,
   DICT_STREAM_FEC_LEVEL,
   DICT_STREAM_MSS,
+  DICT_STREAM_TIMEBASE_NUM,
+  DICT_STREAM_TIMEBASE_DEN,
 };
 
 TLV_MAKE_DICT(signalling_data_dict, 
@@ -154,6 +156,8 @@ TLV_MAKE_DICT(stream_data_dict,
   TLV_DICT(DICT_STREAM_RX_QUEUE_LENGTH, encode_u8, NULL, decode_u8, NULL), 
   TLV_DICT(DICT_STREAM_FEC_LEVEL, encode_u8, NULL, decode_u8, NULL), 
   TLV_DICT(DICT_STREAM_MSS, encode_u16, NULL, decode_u16, NULL), 
+  TLV_DICT(DICT_STREAM_TIMEBASE_NUM, encode_u16, NULL, decode_u16, NULL), 
+  TLV_DICT(DICT_STREAM_TIMEBASE_DEN, encode_u16, NULL, decode_u16, NULL), 
 );
 
 static
@@ -172,13 +176,15 @@ int encode_stream(va_list *ap, uint8_t *dst, void *user_ctx) {
         DICT_STREAM_BITRATE, stream->desc.bitrate,
         DICT_STREAM_VIDEO_WIDTH, stream->desc.video.width,
         DICT_STREAM_VIDEO_HEIGHT, stream->desc.video.height,
-        DICT_STREAM_VIDEO_FPS_NUM, stream->desc.video.fps_num,
-        DICT_STREAM_VIDEO_FPS_DEN, stream->desc.video.fps_den,
+        DICT_STREAM_VIDEO_FPS_NUM, stream->desc.video.fps.num,
+        DICT_STREAM_VIDEO_FPS_DEN, stream->desc.video.fps.den,
         DICT_STREAM_DESCRIPTION, stream->desc.description,
         DICT_STREAM_ENCRYPTION, stream->desc.encryption,
         DICT_STREAM_RX_QUEUE_LENGTH, stream->desc.rx_queue_length,
         DICT_STREAM_FEC_LEVEL, stream->desc.fec_level,
         DICT_STREAM_MSS, stream->desc.stream_mss,
+        DICT_STREAM_TIMEBASE_NUM, stream->desc.timebase.num,
+        DICT_STREAM_TIMEBASE_DEN, stream->desc.timebase.den,
         TLV_END
       );
     case NAVI_STREAM_AUDIO:
@@ -198,6 +204,8 @@ int encode_stream(va_list *ap, uint8_t *dst, void *user_ctx) {
         DICT_STREAM_RX_QUEUE_LENGTH, stream->desc.rx_queue_length,
         DICT_STREAM_FEC_LEVEL, stream->desc.fec_level,
         DICT_STREAM_MSS, stream->desc.stream_mss,
+        DICT_STREAM_TIMEBASE_NUM, stream->desc.timebase.num,
+        DICT_STREAM_TIMEBASE_DEN, stream->desc.timebase.den,
         TLV_END
       );
       case NAVI_STREAM_NULL:
@@ -262,8 +270,8 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
     DICT_STREAM_BITRATE, &stream->desc.bitrate,
     DICT_STREAM_VIDEO_WIDTH, &stream->desc.video.width,
     DICT_STREAM_VIDEO_HEIGHT, &stream->desc.video.height,
-    DICT_STREAM_VIDEO_FPS_NUM, &stream->desc.video.fps_num,
-    DICT_STREAM_VIDEO_FPS_DEN, &stream->desc.video.fps_den,
+    DICT_STREAM_VIDEO_FPS_NUM, &stream->desc.video.fps.num,
+    DICT_STREAM_VIDEO_FPS_DEN, &stream->desc.video.fps.den,
     DICT_STREAM_AUDIO_RATE, &stream->desc.audio.rate,
     DICT_STREAM_AUDIO_CHANNELS, &stream->desc.audio.channels,
     DICT_STREAM_DESCRIPTION, &stream->desc.description,
@@ -271,6 +279,8 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
     DICT_STREAM_RX_QUEUE_LENGTH, &stream->desc.rx_queue_length,
     DICT_STREAM_FEC_LEVEL, &stream->desc.fec_level,
     DICT_STREAM_MSS, &stream->desc.stream_mss,
+    DICT_STREAM_TIMEBASE_NUM, &stream->desc.timebase.num,
+    DICT_STREAM_TIMEBASE_DEN, &stream->desc.timebase.den,
     TLV_END
   );
 
@@ -355,8 +365,8 @@ int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ct
     DICT_STREAM_BITRATE, &stream->desc.bitrate,
     DICT_STREAM_VIDEO_WIDTH, &stream->desc.video.width,
     DICT_STREAM_VIDEO_HEIGHT, &stream->desc.video.height,
-    DICT_STREAM_VIDEO_FPS_NUM, &stream->desc.video.fps_num,
-    DICT_STREAM_VIDEO_FPS_DEN, &stream->desc.video.fps_den,
+    DICT_STREAM_VIDEO_FPS_NUM, &stream->desc.video.fps.num,
+    DICT_STREAM_VIDEO_FPS_DEN, &stream->desc.video.fps.den,
     DICT_STREAM_AUDIO_RATE, &stream->desc.audio.rate,
     DICT_STREAM_AUDIO_CHANNELS, &stream->desc.audio.channels,
     DICT_STREAM_DESCRIPTION, &stream->desc.description,
@@ -364,6 +374,8 @@ int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ct
     DICT_STREAM_RX_QUEUE_LENGTH, &stream->desc.rx_queue_length,
     DICT_STREAM_FEC_LEVEL, &stream->desc.fec_level,
     DICT_STREAM_MSS, &stream->desc.stream_mss,
+    DICT_STREAM_TIMEBASE_NUM, &stream->desc.timebase.num,
+    DICT_STREAM_TIMEBASE_DEN, &stream->desc.timebase.den,
     TLV_END
   );
   if (res<0) {

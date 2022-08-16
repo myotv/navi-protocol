@@ -55,6 +55,10 @@ struct navi_config_s {
   int multicast_receive_reports;
 };
 
+struct navi_rational_num {
+  int num,den;
+};
+
 struct navi_stream_desc_s {
   enum {
     NAVI_STREAM_NULL=0,
@@ -70,7 +74,7 @@ struct navi_stream_desc_s {
     struct {
       int width;
       int height;
-      int fps_num,fps_den;
+      struct navi_rational_num fps;
     } video;
     struct {
       int rate;
@@ -87,6 +91,7 @@ struct navi_stream_desc_s {
   int fec_level;
   int rx_queue_length;
   int stream_mss;
+  struct navi_rational_num timebase;
 };
 
 struct navi_protocol_stream_list_s {
