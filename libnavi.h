@@ -168,6 +168,7 @@ void navi_register_timesource(struct navi_protocol_ctx_s *navi_ctx, navi_timesou
 // these flags are allowed for user
 #define NAVI_DATA_FLAG_KEYFRAME 0x01
 #define NAVI_DATA_FLAG_DEBUG_DATA_PATH 0x02
+#define NAVI_DATA_FLAG_EOF 0x04
 int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, const int64_t dts, const int flags, const void *packet_data, int packet_size);
 
 struct navi_received_frame_data_s *navi_get_stream_received_frame(struct navi_stream_ctx_s *stream_ctx);
