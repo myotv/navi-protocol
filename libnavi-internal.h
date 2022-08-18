@@ -195,7 +195,7 @@ enum navi_protocol_state_e navi_get_protocol_state(struct navi_protocol_ctx_s *n
   return res;
 }
 
-#ifdef WITH_DEBUG
+#ifdef NAVI_WITH_DEBUG
 #define navi_set_protocol_state(_ctx, _state, _with_lock) _navi_set_protocol_state(_ctx, _state, _with_lock, __FILE__, __LINE__)
 static inline
 void _navi_set_protocol_state(struct navi_protocol_ctx_s *navi_ctx, const enum navi_protocol_state_e state, const int with_lock, const char *file, const int line) {

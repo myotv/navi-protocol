@@ -3,6 +3,8 @@
 
 #include "navi-config.h"
 
+#include "compat.h"
+
 enum navi_loglevel_e {
   LL_NAVI_NONE=0,
   LL_NAVI_CRITICAL,
@@ -221,7 +223,7 @@ extern void *navi_logger_func_arg;
 } while (0)
 
 // these macros for debugging development library, must be removed in production build
-#ifdef WITH_DEBUG
+#ifdef NAVI_WITH_DEBUG
 #define DEBUG_FAILURE(navi_ctx, stream_ctx, format...) do { \
   pthread_spin_lock(&navi_logger_lock); \
   navi_logger_t fn=navi_logger_func; \

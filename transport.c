@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <alloca.h>
 #include <errno.h>
-#include <endian.h>
 #include <fcntl.h>
 
 #include <netinet/in.h>
@@ -1594,7 +1593,7 @@ int navi_transport_create(struct navi_protocol_ctx_s *navi_ctx) {
     return -1;
   }
 
-#ifdef WITH_DEBUG
+#ifdef NAVI_WITH_DEBUG
   juice_set_log_level(JUICE_LOG_LEVEL_DEBUG);
 #endif
 

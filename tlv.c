@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <endian.h>
 #include <alloca.h>
 #include <string.h>
 #include <pthread.h>

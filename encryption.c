@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <endian.h>
 #include <unistd.h>
 #include <netinet/ip.h>
 #include <pthread.h>
