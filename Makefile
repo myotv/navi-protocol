@@ -13,12 +13,12 @@ all: libnavi.a libnavi-test.a tests
 
 -include $(wildcard *.d)
 
-libnavi.a: libnavi.o encryption.o utils.o transport.o tlv.o perfcounters.o
+libnavi.a: libnavi.o encryption.o utils.o transport.o tlv.o perfcounters.o navi-compat.o
 	$(LD) -flto -r $^ -o libnavi_all.o
 	ar crs $@ libnavi_all.o
 	nm libnavi_all.o | grep ' T ' | cut -d\  -f 3 | grep -v '^navi_' | sed 's/^/-L /' | xargs objcopy libnavi.a
 
-libnavi-test.a: libnavi.o encryption.o utils.o transport.o tlv.o perfcounters.o
+libnavi-test.a: libnavi.o encryption.o utils.o transport.o tlv.o perfcounters.o navi-compat.o
 	ar crs $@ $^
 
 clean:

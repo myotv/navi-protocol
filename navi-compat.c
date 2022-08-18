@@ -1,5 +1,5 @@
 
-#include "compat.h"
+#include "navi-compat.h"
 
 #ifdef __APPLE__
 

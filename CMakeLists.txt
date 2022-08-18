@@ -10,7 +10,7 @@ set(SOURCES
     tlv.c
     transport.c
     utils.c
-    compat.c
+    navi-compat.c
 )
 
 add_library(${PROJECT_NAME} ${SOURCES})

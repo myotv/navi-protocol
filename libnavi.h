@@ -3,7 +3,7 @@
 
 #include "navi-config.h"
 
-#include "compat.h"
+#include "navi-compat.h"
 
 enum navi_loglevel_e {
   LL_NAVI_NONE=0,
