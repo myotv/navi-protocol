@@ -1,5 +1,5 @@
-static char *discovery_group_addr="224.0.0.100";
-static char *report_group_addr="224.0.0.100";
+static char *discovery_group_addr="224.1.0.1";
+static char *report_group_addr="224.1.0.1";
 static bool discovery_group_addr_set=false;
 static bool report_group_addr_set=false;
 static int mcast_discovery_fd=0;
@@ -68,6 +68,14 @@ int navi_transport_set_multicast_discovery(const int enable) {
   static const int yes=1;
   if (setsockopt(mcast_discovery_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))<0) {
     DEBUG_FAILURE_A("Can't set SO_REUSEADDR, error %s",strerror(errno));
+    close(mcast_discovery_fd);
+    mcast_discovery_fd=0;
+    return -1;
+  }
+
+  static const int multicastTTL=20;
+  if (setsockopt(mcast_discovery_fd, IPPROTO_IP, IP_MULTICAST_TTL, &multicastTTL, sizeof(multicastTTL))<0) {
+    DEBUG_FAILURE_A("Can't set IP_MULTICAST_TTL, error %s",strerror(errno));
     close(mcast_discovery_fd);
     mcast_discovery_fd=0;
     return -1;
@@ -450,6 +458,14 @@ int navi_transport_start_multicast_on_addr(struct navi_protocol_ctx_s *navi_ctx,
     return -1;
   }
 
+  static const int multicastTTL=20;
+  if (setsockopt(navi_ctx->mcast.mcast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &multicastTTL, sizeof(multicastTTL))<0) {
+    DEBUG_FAILURE_A("Can't set IP_MULTICAST_TTL, error %s",strerror(errno));
+    close(navi_ctx->mcast.mcast_socket);
+    navi_ctx->mcast.mcast_socket=0;
+    return -1;
+  }
+
   navi_ctx->mcast.group_addr.sin_family=AF_INET;
 
   if (!group_addr) {
@@ -643,6 +659,14 @@ int navi_start_mcast_report_sending(void) {
     return -1;
   }
 
+  static const int multicastTTL=20;
+  if (setsockopt(mcast_report_send_fd, IPPROTO_IP, IP_MULTICAST_TTL, &multicastTTL, sizeof(multicastTTL))<0) {
+    DEBUG_FAILURE_A("Can't set IP_MULTICAST_TTL, error %s",strerror(errno));
+    close(mcast_report_send_fd);
+    mcast_report_send_fd=0;
+    return -1;
+  }
+
   mcast_report_addr.sin_family=AF_INET;
   mcast_report_addr.sin_port=htons(NAVI_MULTICAST_REPORT_PORT);
   mcast_report_addr.sin_addr.s_addr=inet_addr(report_group_addr);
@@ -824,7 +848,7 @@ int navi_transport_receive_multicast_report(struct navi_protocol_ctx_s *navi_ctx
 
   static const int yes=1;
   if (setsockopt(navi_ctx->mcast.mcast_report_recv_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))<0) {
-    DEBUG_FAILURE_A("Can't set SO_REUSEADDR, error %s",strerror(errno));
+    DEBUG_FAILURE(navi_ctx,NULL,"Can't set SO_REUSEADDR, error %s",strerror(errno));
     close(navi_ctx->mcast.mcast_report_recv_socket);
     navi_ctx->mcast.mcast_report_recv_socket=0;
     return -1;
@@ -832,7 +856,15 @@ int navi_transport_receive_multicast_report(struct navi_protocol_ctx_s *navi_ctx
 
   static const int no=0;
   if (setsockopt(navi_ctx->mcast.mcast_report_recv_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &no, sizeof (no))<0) {
-    DEBUG_FAILURE_A("Can't unset IP_MULTICAST_LOOP, error %s",strerror(errno));
+    DEBUG_FAILURE(navi_ctx,NULL,"Can't unset IP_MULTICAST_LOOP, error %s",strerror(errno));
+    close(navi_ctx->mcast.mcast_report_recv_socket);
+    navi_ctx->mcast.mcast_report_recv_socket=0;
+    return -1;
+  }
+
+  static const int multicastTTL=20;
+  if (setsockopt(navi_ctx->mcast.mcast_report_recv_socket, IPPROTO_IP, IP_MULTICAST_TTL, &multicastTTL, sizeof(multicastTTL))<0) {
+    DEBUG_FAILURE(navi_ctx,NULL,"Can't set IP_MULTICAST_TTL, error %s",strerror(errno));
     close(navi_ctx->mcast.mcast_report_recv_socket);
     navi_ctx->mcast.mcast_report_recv_socket=0;
     return -1;
