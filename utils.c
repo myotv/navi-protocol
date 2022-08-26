@@ -1,3 +1,4 @@
+#include <sys/types.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,9 +9,9 @@
 #include "libnavi.h"
 
 void _navi_hexdump(const void *p, size_t len, const char *file, const int line) {
-  const char *d=p;
+  const uint8_t *d=p;
   unsigned long i;
-  char buffer[16*3+32];
+  char buffer[1024];
   int bptr=0;
   DEBUG_printf_a("%s:%d\n",file,line);
   for (i=0; i<len; ++i) {
