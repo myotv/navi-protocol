@@ -94,6 +94,8 @@ struct navi_stream_desc_s {
   int rx_queue_length;
   int stream_mss;
   struct navi_rational_num timebase;
+  char *profile;
+  char *level;
 };
 
 struct navi_protocol_stream_list_s {
