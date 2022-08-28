@@ -331,3 +331,30 @@ int decode_u64_array(uint8_t *src, const int src_len, void *dst, const int idx, 
   }
   return sizeof(uint64_t);
 }
+
+int encode_bindata(va_list* ap, uint8_t *dst, void *user_ctx) {
+  void *data=va_arg(*ap, void *);
+  const int data_len=va_arg(*ap, int);
+  if (!data || data_len<1) return 0;
+  else {
+    if (dst) memcpy(dst, data, data_len);
+    return data_len;
+  }
+  return -1;
+}
+
+int decode_bindata(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
+  tlv_binary_buffer *dst_data=(tlv_binary_buffer *)dst;
+  if (!dst_data) return 0;
+
+  if (src_len==0) {
+    *dst_data->data=NULL;
+    *dst_data->data_len=0;
+    return 0;
+  } else {
+    *dst_data->data=malloc(src_len);
+    memcpy(*dst_data->data, src, src_len);
+    *dst_data->data_len=src_len;
+  }
+  return src_len;
+}

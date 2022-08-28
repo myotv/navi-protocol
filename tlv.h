@@ -93,6 +93,13 @@ typedef struct tlv_dictionary_element_s {
   int (*decode_array)(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 } tlv_dictionary_element;
 
+typedef struct tlv_binary_buffer_s {
+  void **data;
+  int *data_len;
+} tlv_binary_buffer;
+
+#define MAKE_BINARY_BUFFER(_data, _data_len) ({ tlv_binary_buffer *B=(tlv_binary_buffer *)alloca(sizeof(tlv_binary_buffer)); B->data=&_data; B->data_len=&_data_len; B; })
+
 int tlv_encode(struct navi_protocol_ctx_s *navi_ctx, void *dst_data, const struct tlv_dictionary_element_s *dictionary, void *user_ctx, ...);
 int tlv_decode(struct navi_protocol_ctx_s *navi_ctx, void *src_data, const int src_len, const struct tlv_dictionary_element_s *dictionary, void *user_ctx, ...);
 
@@ -124,5 +131,8 @@ int encode_double(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_double_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_double(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_double_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
+
+int encode_bindata(va_list* ap, uint8_t *dst, void *user_ctx);
+int decode_bindata(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 
 #endif

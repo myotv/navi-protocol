@@ -96,6 +96,8 @@ struct navi_stream_desc_s {
   struct navi_rational_num timebase;
   char *profile;
   char *level;
+  void *extradata;
+  int extradata_size;
 };
 
 struct navi_protocol_stream_list_s {

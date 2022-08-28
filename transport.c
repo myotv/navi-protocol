@@ -93,6 +93,7 @@ enum {
   DICT_STREAM_TIMEBASE_DEN,
   DICT_STREAM_PROFILE,
   DICT_STREAM_LEVEL,
+  DICT_STREAM_EXTRADATA
 };
 
 TLV_MAKE_DICT(signalling_data_dict, 
@@ -161,6 +162,7 @@ TLV_MAKE_DICT(stream_data_dict,
   TLV_DICT(DICT_STREAM_TIMEBASE_DEN, encode_u16, NULL, decode_u16, NULL), 
   TLV_DICT(DICT_STREAM_PROFILE, encode_strz, NULL, decode_strz, NULL), 
   TLV_DICT(DICT_STREAM_LEVEL, encode_strz, NULL, decode_strz, NULL), 
+  TLV_DICT(DICT_STREAM_EXTRADATA, encode_bindata, NULL, decode_bindata, NULL), 
 );
 
 static
@@ -190,6 +192,7 @@ int encode_stream(va_list *ap, uint8_t *dst, void *user_ctx) {
         DICT_STREAM_TIMEBASE_DEN, stream->desc.timebase.den,
         DICT_STREAM_PROFILE, stream->desc.profile,
         DICT_STREAM_LEVEL, stream->desc.level,
+        DICT_STREAM_EXTRADATA, stream->desc.extradata, stream->desc.extradata_size,
         TLV_END
       );
     case NAVI_STREAM_AUDIO:
@@ -213,6 +216,7 @@ int encode_stream(va_list *ap, uint8_t *dst, void *user_ctx) {
         DICT_STREAM_TIMEBASE_DEN, stream->desc.timebase.den,
         DICT_STREAM_PROFILE, stream->desc.profile,
         DICT_STREAM_LEVEL, stream->desc.level,
+        DICT_STREAM_EXTRADATA, stream->desc.extradata, stream->desc.extradata_size,
         TLV_END
       );
       case NAVI_STREAM_NULL:
@@ -290,6 +294,7 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
     DICT_STREAM_TIMEBASE_DEN, &stream->desc.timebase.den,
     DICT_STREAM_PROFILE, &stream->desc.profile,
     DICT_STREAM_LEVEL, &stream->desc.level,
+    DICT_STREAM_EXTRADATA, MAKE_BINARY_BUFFER(stream->desc.extradata, stream->desc.extradata_size),
     TLV_END
   );
 
@@ -387,6 +392,7 @@ int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ct
     DICT_STREAM_TIMEBASE_DEN, &stream->desc.timebase.den,
     DICT_STREAM_PROFILE, &stream->desc.profile,
     DICT_STREAM_LEVEL, &stream->desc.level,
+    DICT_STREAM_EXTRADATA, MAKE_BINARY_BUFFER(stream->desc.extradata, stream->desc.extradata_size),
     TLV_END
   );
   if (res<0) {
