@@ -23,4 +23,8 @@
 #define NAVI_HANDLE_JIUCE_OUTPUT 1
 #endif
 
+#ifndef NAVI_DEBUG_MEMORY_ALLOCATION
+#define NAVI_DEBUG_MEMORY_ALLOCATION 1
+#endif
+
 #endif

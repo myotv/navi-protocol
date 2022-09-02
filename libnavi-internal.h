@@ -251,7 +251,7 @@ int navi_wait_for_state(struct navi_protocol_ctx_s *navi_ctx, const enum navi_pr
 
 #define NAVI_NO_EXPORT __attribute__ ((visibility ("hidden")))
 
-#define FREEP(x) do {  free(x); x=NULL; } while (0)
+#define FREEP(x) do {  NAVI_free(x); x=NULL; } while (0)
 
 #define NAVI_INIT_PERFCOUNTER(container, name, is_gauge) navi_init_perfcounter(&container.name, TOSTRING(name), is_gauge)
 #define NAVI_INIT_REMOTE_PERFCOUNTER(container, name, is_gauge) navi_init_remote_perfcounter(&container.name, TOSTRING(name), is_gauge)

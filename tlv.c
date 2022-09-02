@@ -9,6 +9,7 @@
 
 #include "libnavi.h"
 #include "tlv.h"
+#include "utils.h"
 
 struct tlv_header_s {
   TLV_KEY_TYPE type;
@@ -199,7 +200,7 @@ int decode_strz(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
     *dst_str=NULL;
     return 0;
   } else {
-    *dst_str=(char *)malloc(src_len);
+    *dst_str=(char *)NAVI_malloc(src_len);
     memcpy(*dst_str, src, src_len);
   }
   return sizeof(char *);
@@ -213,7 +214,7 @@ int decode_strz_arr(uint8_t *src, const int src_len, void *dst, const int idx, v
     *dst_str=NULL;
     return 0;
   } else {
-    *dst_str=(char *)malloc(src_len);
+    *dst_str=(char *)NAVI_malloc(src_len);
     memcpy(*dst_str, src, src_len);
   }
   return sizeof(char *);
@@ -352,7 +353,7 @@ int decode_bindata(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
     *dst_data->data_len=0;
     return 0;
   } else {
-    *dst_data->data=malloc(src_len);
+    *dst_data->data=NAVI_malloc(src_len);
     memcpy(*dst_data->data, src, src_len);
     *dst_data->data_len=src_len;
   }

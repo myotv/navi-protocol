@@ -268,7 +268,7 @@ static
 int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
   int res;
   struct navi_protocol_ctx_s *navi_ctx=(struct navi_protocol_ctx_s *)dst;
-  struct navi_stream_ctx_s *stream=malloc(sizeof(struct navi_stream_ctx_s));
+  struct navi_stream_ctx_s *stream=NAVI_malloc(sizeof(struct navi_stream_ctx_s));
   memset(&stream->desc, 0, sizeof(stream->desc));
   res=tlv_decode(
     navi_ctx, 
@@ -299,7 +299,7 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
   );
 
   if (res<0) {
-    free(stream);
+    NAVI_free(stream);
     DEBUG_FAILURE(navi_ctx, NULL, "Can't decode stream info\n");
     return -1;
   }
@@ -308,7 +308,7 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
   for (struct navi_stream_ctx_s *s=navi_ctx->rx_streams; s; s=s->next) {
     if (s->stream_id==stream->stream_id) {
       pthread_spin_unlock(&navi_ctx->rx_streams_lock);
-      free(stream);
+      NAVI_free(stream);
       return 0;
     }
   }
@@ -319,7 +319,7 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
   stream->rx_queue_head=0;
   stream->stream_api_id=0;
 
-  stream->rx_queue=malloc(sizeof(struct navi_rx_packet_s *)*stream->desc.rx_queue_length);
+  stream->rx_queue=NAVI_malloc(sizeof(struct navi_rx_packet_s *)*stream->desc.rx_queue_length);
   memset(stream->rx_queue, 0, sizeof(struct navi_rx_packet_s *)*stream->desc.rx_queue_length);
 
   stream->rx_done_queue=NULL;
@@ -364,7 +364,7 @@ int decode_stream(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
 
 static
 int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
-  struct navi_protocol_stream_list_s *stream=(struct navi_protocol_stream_list_s *)malloc(sizeof(struct navi_protocol_stream_list_s));
+  struct navi_protocol_stream_list_s *stream=(struct navi_protocol_stream_list_s *)NAVI_malloc(sizeof(struct navi_protocol_stream_list_s));
   struct navi_protocol_stream_list_s **list_head=(struct navi_protocol_stream_list_s **)dst;
   int res;
   memset(stream, 0, sizeof(struct navi_protocol_stream_list_s));
@@ -396,7 +396,7 @@ int decode_stream_desc(uint8_t *src, const int src_len, void *dst, void *user_ct
     TLV_END
   );
   if (res<0) {
-    free(stream);
+    NAVI_free(stream);
     return res;
   }
 
@@ -568,8 +568,8 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
           DEBUG_FAILURE(navi_ctx, NULL, "Can't decode offer\n");
           rx_ok=false;
         }
-        free(name);
-        free(sdp);
+        NAVI_free(name);
+        NAVI_free(sdp);
       }
       break;
 
@@ -582,8 +582,8 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
           if (navi_ctx->events.answer_event) {
             if (navi_ctx->events.answer_event(navi_ctx, *((uint32_t *)&buffer[1+sizeof(navi_ctx->domain_hash)]), name, sdp, navi_ctx->events.answer_event_data)==-1) {
               DEBUG_FAILURE(navi_ctx, NULL, "'answer_event' hook reject answer\n");
-              free(name);
-              free(sdp);
+              NAVI_free(name);
+              NAVI_free(sdp);
               FREEP(decrypted_data);
               navi_inc_perfcounter(&navi_ctx->counters.signalling_rx_error);
               return -1;
@@ -592,8 +592,8 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
           if (juice_get_state(agent)==JUICE_STATE_DISCONNECTED) {
             if (juice_set_remote_description(agent, sdp)) {
               DEBUG_FAILURE(navi_ctx, NULL, "can't set remote answer\n");
-              free(name);
-              free(sdp);
+              NAVI_free(name);
+              NAVI_free(sdp);
               FREEP(decrypted_data);
               navi_inc_perfcounter(&navi_ctx->counters.signalling_rx_error);
               return -1;
@@ -604,8 +604,8 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
           DEBUG_FAILURE(navi_ctx, NULL, "Can't decode offer\n");
           rx_ok=false;
         }
-        free(name);
-        free(sdp);
+        NAVI_free(name);
+        NAVI_free(sdp);
       }
       break;
 
@@ -632,7 +632,7 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
             DEBUG_FAILURE(navi_ctx, NULL, "Can't decode offer\n");
             rx_ok=false;
           }
-          free(sdp);
+          NAVI_free(sdp);
         }
       }
       break;
@@ -755,7 +755,7 @@ void on_candidate(juice_agent_t *agent, const char *sdp, void *user_ptr) {
 
   signalling_send(navi_ctx, NS_UPDATE_CANDIDATE, encrypted_data, encrypted_len);
 
-  free(encrypted_data);
+  NAVI_free(encrypted_data);
 
   signalling_check(navi_ctx);
 }
@@ -806,7 +806,7 @@ void on_gathering_done(juice_agent_t *agent, void *user_ptr) {
 
   signalling_send(navi_ctx, NS_UPDATE_CANDIDATE, encrypted_data, encrypted_len);
 
-  free(encrypted_data);
+  NAVI_free(encrypted_data);
 }
 
 static
@@ -820,7 +820,7 @@ void free_fragment_queue(struct navi_rx_packet_fragment_s **q) {
     if (list->decrypted_data) {
       FREEP(list->decrypted_data);
     }
-    free(list);
+    NAVI_free(list);
     list=next;
   }
 }
@@ -902,7 +902,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
 
           DEBUG_printf(navi_ctx,stream_ctx,"recover fragment %d fec group %d fec data %p\n",i,fec_group_id,fec_packet);
 
-          pkt_fragment=malloc(sizeof(struct navi_rx_packet_fragment_s)+stream_ctx->desc.stream_mss+NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN));
+          pkt_fragment=NAVI_malloc(sizeof(struct navi_rx_packet_fragment_s)+stream_ctx->desc.stream_mss+NAVI_AES_ENCRYPTED_LEN(sizeof(struct NaviProtocolDataFrameHeader),NAVI_AES128_TAIL_LEN));
           pkt_fragment->fec=fec_packet;
           pkt_fragment->head=src_fragment->head;
           pkt_fragment->head.flags&=~NAVI_DATA_FLAG_ENCRYPTED_DATA;
@@ -924,7 +924,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
               fec_packet->decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, fec_packet->data, fec_packet->data_len, &fec_packet->decrypted_data_len);
             }
             if (!fec_packet->decrypted_data) {
-              free(pkt_fragment);
+              NAVI_free(pkt_fragment);
               DEBUG_FAILURE(navi_ctx,stream_ctx,"Can't decrypt fec packet\n");
               navi_inc_perfcounter(&stream_ctx->counters.rx_loss_count);
               navi_inc_perfcounter(&stream_ctx->counters.rx_loss_rate);
@@ -933,7 +933,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
             }
             if (fec_packet->decrypted_data_len<(pkt_fragment->payload_len+sizeof(struct NaviProtocolDataFrameHeader))) {
               FREEP(fec_packet->decrypted_data);
-              free(pkt_fragment);
+              NAVI_free(pkt_fragment);
               DEBUG_FAILURE(navi_ctx,stream_ctx,"Decrypted packet length aless than required\n");
               navi_inc_perfcounter(&stream_ctx->counters.rx_loss_count);
               navi_inc_perfcounter(&stream_ctx->counters.rx_loss_rate);
@@ -976,7 +976,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
                     f->decrypted_data=navi_decrypt_with_dh_secret(navi_ctx, f->data, f->data_len, &f->decrypted_data_len);
                   }
                   if (!f->decrypted_data) {
-                    free(pkt_fragment);
+                    NAVI_free(pkt_fragment);
                     DEBUG_FAILURE(navi_ctx,stream_ctx,"Can't decrypt packet in fec process\n");
                     navi_inc_perfcounter(&stream_ctx->counters.rx_loss_count);
                     navi_inc_perfcounter(&stream_ctx->counters.rx_loss_rate);
@@ -1023,7 +1023,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
     } 
     DEBUG_printf(navi_ctx,stream_ctx,"Lost packets %d\n",lost_packets);
     if (!lost_packets) {
-      struct navi_received_frame_s *rx_frame=malloc(sizeof(struct navi_received_frame_s)+rx_packet->packet_size);
+      struct navi_received_frame_s *rx_frame=NAVI_malloc(sizeof(struct navi_received_frame_s)+rx_packet->packet_size);
       uint8_t *rx_packet_data=rx_frame->data.data;
       uint32_t ptr=0;
       int decrypt_error=0;
@@ -1060,7 +1060,7 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
             if (pkt->decrypted_data==decrypted_data) {
               pkt->decrypted_data=NULL;
             }
-            free(decrypted_data);
+            NAVI_free(decrypted_data);
           }
         } else {
           /*
@@ -1286,14 +1286,14 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
   rx_packet=stream_ctx->rx_queue[rx_packet_id-stream_ctx->rx_queue_head];
   DEBUG_printf(navi_ctx,stream_ctx,"-- rx packet %p\n",rx_packet);
   if (!rx_packet) {
-    rx_packet=(struct navi_rx_packet_s *)malloc(sizeof(struct navi_rx_packet_s));
+    rx_packet=(struct navi_rx_packet_s *)NAVI_malloc(sizeof(struct navi_rx_packet_s));
     rx_packet->packet_id=rx_packet_id;
     rx_packet->done=0;
     #ifdef DEBUG_DATA_PACKETS
     if (!(fragment_head->flags&NAVI_DATA_FLAG_DEBUG_DATA)) {
       rx_packet->packet_size=be32toh(fragment_head->frame_size);
       rx_packet->fragment_count=be16toh(fragment_head->frame_count);
-      rx_packet->fragments=malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+      rx_packet->fragments=NAVI_malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
       memset(rx_packet->fragments, 0, sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
     } else {
       rx_packet->packet_size=0;
@@ -1303,7 +1303,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
     #else
     rx_packet->packet_size=be32toh(fragment_head->frame_size);
     rx_packet->fragment_count=be16toh(fragment_head->frame_count);
-    rx_packet->fragments=malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+    rx_packet->fragments=NAVI_malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
     memset(rx_packet->fragments, 0, sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
     #endif
     rx_packet->debug_data=NULL;
@@ -1323,7 +1323,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
     DEBUG_printf(navi_ctx,stream_ctx,"** update debug info pkt %d\n",rx_packet_id);
     FREEP(rx_packet->debug_data);
     if (stream_ctx->desc.encryption==NAVI_ENCRYPT_NONE) {
-      rx_packet->debug_data=malloc(payload_len);
+      rx_packet->debug_data=NAVI_malloc(payload_len);
       rx_packet->debug_data_len=payload_len;
       memcpy(rx_packet->debug_data, head->payload, payload_len);
     } else {
@@ -1335,7 +1335,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
   if (rx_packet->packet_size==0 && rx_packet->fragment_count==0) {
     rx_packet->packet_size=be32toh(fragment_head->frame_size);
     rx_packet->fragment_count=be16toh(fragment_head->frame_count);
-    rx_packet->fragments=malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
+    rx_packet->fragments=NAVI_malloc(sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
     memset(rx_packet->fragments, 0, sizeof(struct navi_rx_packet_fragment_s *)*rx_packet->fragment_count);
     DEBUG_printf(navi_ctx,stream_ctx,"-- update real packet info size %d frags %d\n",rx_packet->packet_size,rx_packet->fragment_count);
   }
@@ -1343,7 +1343,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
 
   navi_add_perfcounter(&navi_ctx->counters.rx_rate, payload_len);
 
-  pkt_fragment=malloc(sizeof(struct navi_rx_packet_fragment_s)+payload_len);
+  pkt_fragment=NAVI_malloc(sizeof(struct navi_rx_packet_fragment_s)+payload_len);
   DEBUG_printf(navi_ctx,stream_ctx,"*** fragment %p idx %d len %d\n",pkt_fragment,fragment_idx,payload_len); fflush(stdout);
   pkt_fragment->head=*fragment_head;
   pkt_fragment->data_len=payload_len;
@@ -1447,7 +1447,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
         return;
       }
 
-      void *remote_start_pkey=malloc(payload_len);
+      void *remote_start_pkey=NAVI_malloc(payload_len);
       void *ptr_to_free;
       memcpy(remote_start_pkey, head->payload, payload_len);
       NAVI_LOCK_CTX(navi_ctx);
@@ -1455,7 +1455,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
       navi_ctx->remote_start_pkey=remote_start_pkey;
       navi_ctx->remote_start_pkey_len=payload_len;
       NAVI_UNLOCK_CTX(navi_ctx);
-      free(ptr_to_free);
+      NAVI_free(ptr_to_free);
 
       /*
       if (payload_len!=(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len)) {
@@ -1480,7 +1480,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
       navi_ctx->rx_streams_encrypted_len=0;
     }
     if (!navi_ctx->rx_streams_encrypted) {
-      navi_ctx->rx_streams_encrypted=malloc(payload_len+1);
+      navi_ctx->rx_streams_encrypted=NAVI_malloc(payload_len+1);
       navi_ctx->rx_streams_encrypted_len=payload_len;
     }
     if (payload_len>0) {
@@ -1505,7 +1505,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
           } else {
             DEBUG_FAILURE(navi_ctx, stream_ctx,"Can't decrypt frame fragment header %p %d\n",decrypted_data,data_len);
           }
-          free(decrypted_data);
+          NAVI_free(decrypted_data);
         }
       }
     }
@@ -1536,7 +1536,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
           } else {
             DEBUG_FAILURE(navi_ctx,stream_ctx,"Can't decrypt stats frame fragment header %p %d\n",decrypted_data,data_len);
           }
-          if (!items) free(decrypted_data);
+          if (!items) NAVI_free(decrypted_data);
         }
         if (items) {
           //DEBUG_hexdump(items, nitems*sizeof(struct NaviProtocolStatisticElement));
@@ -1587,7 +1587,7 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
           }
           navi_ctx->last_stats_dt=stream_ctx->remote_counters_time=navi_current_time(navi_ctx);
           if ((void *)items!=(void *)head->payload) {
-            free(items);
+            NAVI_free(items);
           }
         }
       }
@@ -1780,7 +1780,7 @@ int navi_signalling_update_state(struct navi_protocol_ctx_s *navi_ctx, const uin
   }
   res=signalling_send(navi_ctx, NS_UPDATE_STATE, state_data, state_data_len);
 
-  free(state_data);
+  NAVI_free(state_data);
 
   return res;
 }
@@ -1875,7 +1875,7 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
 
   res=signalling_send(navi_ctx, NS_UPDATE_ANSWER, encrypted_data, encrypted_len);
 
-  free(encrypted_data);
+  NAVI_free(encrypted_data);
 
   if (res<0) return -1;
 
@@ -2013,7 +2013,7 @@ int navi_transport_work_DH_SEND(struct navi_protocol_ctx_s *navi_ctx) {
     navi_set_protocol_state(navi_ctx, NAVI_STATE_DH_RECEIVED, 0);
   }
 
-  free(remote_start_pkey);  
+  NAVI_free(remote_start_pkey);  
 
   return res;
 }
@@ -2064,7 +2064,7 @@ int navi_transport_work_WAIT_START(struct navi_protocol_ctx_s *navi_ctx) {
           DICT_ANOUNCE_STREAM, navi_ctx, // stream decoder also create list of streams
           TLV_END
         );
-        free(data);
+        NAVI_free(data);
         if (res>=0) navi_set_protocol_state(navi_ctx, NAVI_STATE_PROCED_STREAMS, 1);
       }
     } else {
@@ -2105,7 +2105,7 @@ int navi_transport_work_WAIT_START(struct navi_protocol_ctx_s *navi_ctx) {
     return -1;
   }
 
-  streams_data=malloc(data_len);
+  streams_data=NAVI_malloc(data_len);
   data_len=tlv_encode(
     navi_ctx, 
     streams_data, 
@@ -2117,7 +2117,7 @@ int navi_transport_work_WAIT_START(struct navi_protocol_ctx_s *navi_ctx) {
   );
   if (data_len<0) {
     DEBUG_FAILURE(navi_ctx, NULL, "can't seralize tx streams\n");
-    free(streams_data);
+    NAVI_free(streams_data);
     return -1;
   }
 
@@ -2125,7 +2125,7 @@ int navi_transport_work_WAIT_START(struct navi_protocol_ctx_s *navi_ctx) {
   //DEBUG_hexdump(streams_data, data_len);
 
   data=navi_encrypt_with_dh_secret(navi_ctx, streams_data, data_len, &data_len, NULL);
-  free(streams_data);
+  NAVI_free(streams_data);
   if (!data) {
     DEBUG_FAILURE(navi_ctx, NULL, "can't encrypt tx streams\n");
     return -1;
@@ -2257,7 +2257,7 @@ int navi_transport_work_DISCONNECT(struct navi_protocol_ctx_s *navi_ctx) {
     while (stream->rx_done_queue) {
       struct navi_received_frame_s *frame=stream->rx_done_queue;
       stream->rx_done_queue=stream->rx_done_queue->next;
-      free(frame);
+      NAVI_free(frame);
     }
 
     if (stream->rx_queue) {
@@ -2315,6 +2315,8 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
     int res=-1;
     const uint64_t now_dt=navi_current_time(navi_ctx);
 
+    _navi_memory_report(now_dt);
+
     #if NAVI_WITH_MULTICAST==1
     if (navi_ctx->mcast.enable) {
       if (!navi_ctx->mcast.secret_valid) {
@@ -2332,7 +2334,11 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
         }
         if (navi_ctx->mcast.ondemand_enable) {
           for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {
+            const bool old_value=s->mcast.report_rx_timeout;
             s->mcast.report_rx_timeout=(now_dt-s->mcast.remote_report.report_time)>(NAVI_MCAST_REPORT_PERIOD*2);
+            if (old_value!=s->mcast.report_rx_timeout) {
+              NAVI_LOG(LL_NAVI_INFO, navi_ctx, s, "report_rx_timeout changed from %d to %d\n",old_value,s->mcast.report_rx_timeout);
+            }
           }
         } else {
           for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {

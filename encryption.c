@@ -15,6 +15,7 @@
 #include <openssl/rand.h>
 #include <openssl/md5.h>
 
+#include "navi-config.h"
 #include "utils.h"
 #include "libnavi.h"
 #include "navi-protocol.h"
@@ -92,11 +93,11 @@ uint8_t *export_pkey(EVP_PKEY *key, int *export_len) {
     *export_len=0;
     return NULL;
   }
-  key_data=(uint8_t*)malloc(len);
+  key_data=(uint8_t*)NAVI_malloc(len);
   key_data_ptr=&key_data[0];
   len=i2d_PUBKEY(key, &key_data_ptr);
   if (len<=0) {
-    free(key_data);
+    NAVI_free(key_data);
     *export_len=0;
     return NULL;
   }
@@ -141,11 +142,11 @@ uint8_t *generate_secret(struct navi_protocol_ctx_s *navi_ctx, EVP_PKEY *local_k
     return NULL;
   }
 
-  secret=(uint8_t *)malloc(*secret_len);
+  secret=(uint8_t *)NAVI_malloc(*secret_len);
   if (!EVP_PKEY_derive(ctx, secret, secret_len)) {
     EVP_PKEY_CTX_free(ctx);
     DEBUG_FAILURE(navi_ctx, NULL, "get secret data\n");
-    free(secret);
+    NAVI_free(secret);
     *secret_len=0;
     return NULL;
   }
@@ -167,12 +168,12 @@ void *navi_encrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
   ctx=EVP_CIPHER_CTX_new();
   if (!ctx) return NULL;
 
-  res=malloc(payload_len+EVP_MAX_BLOCK_LENGTH+16 /* iv len */+2 /* length */ + 2 /* crc16 */);
+  res=NAVI_malloc(payload_len+EVP_MAX_BLOCK_LENGTH+16 /* iv len */+2 /* length */ + 2 /* crc16 */);
   RAND_bytes(res, 16);
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->secret_hash, res /* iv */, 1)) {
     EVP_CIPHER_CTX_free(ctx);
-    free(res);
+    NAVI_free(res);
     DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
     *encrypted_len=0;
     return NULL;
@@ -249,7 +250,7 @@ void *navi_decrypt_with_secret(struct navi_protocol_ctx_s *navi_ctx, void *paylo
     return NULL;
   }
 
-  res=malloc(res_len-4);
+  res=NAVI_malloc(res_len-4);
   memcpy(res, &head[2], res_len-4);
   *decrypted_len=res_len-4;
 
@@ -283,7 +284,7 @@ int navi_generate_keys(struct navi_protocol_ctx_s *navi_ctx) {
     return -1;
   }
   navi_ctx->local_pkey=key;
-  navi_ctx->remote_pkey_data=malloc(navi_ctx->local_pkey_len);
+  navi_ctx->remote_pkey_data=NAVI_malloc(navi_ctx->local_pkey_len);
 
   MD5(navi_ctx->local_pkey_data, navi_ctx->local_pkey_len, navi_ctx->local_iv);
 
@@ -313,7 +314,7 @@ int navi_generate_secret(struct navi_protocol_ctx_s *navi_ctx) {
   MD5_Update(&md5, navi_ctx->config.domain_name, strlen(navi_ctx->config.domain_name));
   MD5_Update(&md5, navi_ctx->config.domain_secret, strlen(navi_ctx->config.domain_secret));
   MD5_Final(navi_ctx->encryption_key, &md5);
-  free(secret);
+  NAVI_free(secret);
 
   DEBUG_printf(navi_ctx,NULL,"encryption key\n");
   DEBUG_hexdump(navi_ctx->encryption_key,sizeof(navi_ctx->encryption_key));
@@ -353,7 +354,7 @@ void *navi_encrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *pa
     navi_ctx->encrypt_ctx=ctx;
   }
 
-  if (!res) res=malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
+  if (!res) res=NAVI_malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->encryption_key, navi_ctx->local_iv, 1)) {
     if (!dst_buffer) free(res);
@@ -386,10 +387,10 @@ void *navi_decrypt_with_dh_secret(struct navi_protocol_ctx_s *navi_ctx, void *pa
     navi_ctx->decrypt_ctx=ctx;
   }
 
-  res=malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
+  res=NAVI_malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->encryption_key, navi_ctx->remote_iv, 0)) {
-    free(res);
+    NAVI_free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->decrypt_ctx=NULL;
     DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
@@ -420,10 +421,10 @@ void *navi_encrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
     navi_ctx->mcast.encrypt_ctx=ctx;
   }
 
-  if (!res) res=malloc(payload_len+EVP_MAX_BLOCK_LENGTH+sizeof(navi_ctx->mcast.local_iv));
+  if (!res) res=NAVI_malloc(payload_len+EVP_MAX_BLOCK_LENGTH+sizeof(navi_ctx->mcast.local_iv));
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->mcast.encryption_key, navi_ctx->mcast.local_iv, 1)) {
-    if (!dst_buffer) free(res);
+    if (!dst_buffer) NAVI_free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->mcast.encrypt_ctx=NULL;
     DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");
@@ -463,10 +464,10 @@ void *navi_decrypt_with_mcast_secret(struct navi_protocol_ctx_s *navi_ctx, void 
     navi_ctx->mcast.decrypt_ctx=ctx;
   }
 
-  res=malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
+  res=NAVI_malloc(payload_len+EVP_MAX_BLOCK_LENGTH);
 
   if (!EVP_CipherInit_ex(ctx, EVP_aes_128_cbc(), NULL, navi_ctx->mcast.encryption_key, remote_iv, 0)) {
-    free(res);
+    NAVI_free(res);
     EVP_CIPHER_CTX_free(ctx);
     navi_ctx->mcast.decrypt_ctx=NULL;
     DEBUG_FAILURE(navi_ctx, NULL, "can't init cipher\n");

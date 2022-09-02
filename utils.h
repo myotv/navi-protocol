@@ -24,7 +24,7 @@ typedef struct memclean_list_s {
   } \
 } while (0)
 #else // no alloca()
-#define MEMCLEAN_ALLOC_ELEMENT(el) malloc(sizeof(memclean_list))
+#define MEMCLEAN_ALLOC_ELEMENT(el) NAVI_malloc(sizeof(memclean_list))
 #define MEMCLEAN_FREE(_list) do { \
   while (_list) { \
     memclean_list *_mc_next=_list->next; \
@@ -46,5 +46,26 @@ typedef struct memclean_list_s {
 
 uint16_t crc16(const void *buffer, const uint16_t start, const size_t len);
 uint32_t crc32(const void *buffer, const uint32_t start, const size_t len);
+
+#if NAVI_DEBUG_MEMORY_ALLOCATION!=0
+
+void *_navi_internal_malloc(const size_t size, const int line, const char *file);
+void _navi_internal_free(void *ptr, const int line, const char *file);
+
+void _navi_memory_report(const uint64_t now_dt);
+void _navi_check_pointer(void *ptr, const int line, const char *file);
+
+#define NAVI_malloc(__size) _navi_internal_malloc(__size, __LINE__,__FILE__)
+#define NAVI_free(__ptr) _navi_internal_free(__ptr, __LINE__,__FILE__)
+#define NAVI_checkptr(__ptr) _navi_check_pointer(__ptr, __LINE__, __FILE__)
+
+#else
+#define NAVI_malloc(__size) malloc(__size)
+#define NAVI_free(__ptr) free(__ptr)
+
+#define _navi_memory_report(x)
+#define NAVI_checkptr(x)
+
+#endif
 
 #endif

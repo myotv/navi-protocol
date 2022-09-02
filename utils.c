@@ -3,7 +3,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdlib.h>
 
+#include "navi-config.h"
 #include "utils.h"
 
 #include "libnavi.h"
@@ -170,3 +172,75 @@ uint32_t navi_crc32(const void *buffer, const uint32_t start, const size_t len) 
   }
   return crc;
 }
+
+#if NAVI_DEBUG_MEMORY_ALLOCATION!=0
+
+#define NAVI_PTR_MAGIC 0xFEFE000000000000UL
+
+static size_t navi_allocated_memory=0;
+
+struct navi_memory_pointer_s {
+  uint64_t magic;
+  size_t size;
+  int line;
+  const char *file;
+};
+
+void *_navi_internal_malloc(const size_t size, const int line, const char *file) {
+  struct navi_memory_pointer_s *ptr=malloc(size+sizeof(struct navi_memory_pointer_s));
+  ptr->magic=NAVI_PTR_MAGIC|(((uint64_t)ptr)&0x0000FFFFFFFFFFFFUL);
+  ptr->size=size;
+  ptr->line=line;
+  ptr->file=file;
+  ++ptr;
+  navi_allocated_memory+=size;
+  return (void *)ptr;
+}
+
+void _navi_internal_free(void *ptr, const int line, const char *file) {
+  if (!ptr) return;
+
+  struct navi_memory_pointer_s *head=(struct navi_memory_pointer_s *)ptr;
+  --head;
+  const uint64_t magic=NAVI_PTR_MAGIC|(((uint64_t)head)&0x0000FFFFFFFFFFFFUL);
+  if (magic!=head->magic) {
+    NAVI_LOG(LL_NAVI_ERROR, NULL, NULL, "Free pointer w/o head at %p line %s:%d (%lx %lx)\n",ptr,file,line,magic,head->magic);
+    free(ptr);
+    return;
+  }
+  if (navi_allocated_memory<head->size) {
+    NAVI_LOG(LL_NAVI_ERROR, NULL, NULL, "Free more than allocated, ptr %p line %s:%d\n",ptr,file,line);
+  } else {
+    navi_allocated_memory-=head->size;
+  }
+  free(head);
+}
+
+void _navi_memory_report(const uint64_t now_dt) {
+  if (!now_dt) return;
+
+  static uint64_t last_report_dt=0;
+
+  if ((now_dt-last_report_dt)<10000) return;
+
+  NAVI_LOG(LL_NAVI_INFO, NULL, NULL, "Navi memory in use %lu\n",navi_allocated_memory);
+  last_report_dt=now_dt;
+}
+
+void _navi_check_pointer(void *ptr, const int line, const char *file) {
+  if (!ptr) {
+    NAVI_LOG(LL_NAVI_INFO,NULL,NULL,"ptr NULL at %s:%d\n",file,line);
+    return;
+  }
+  struct navi_memory_pointer_s *head=(struct navi_memory_pointer_s *)ptr;
+  --head;
+  const uint64_t magic=NAVI_PTR_MAGIC|(((uint64_t)head)&0x0000FFFFFFFFFFFFUL);
+  if (magic!=head->magic) {
+    NAVI_LOG(LL_NAVI_ERROR, NULL, NULL, "Pointer %p magic mismatch at %s:%d\n",ptr,file,line);
+    return;
+  }
+  NAVI_LOG(LL_NAVI_INFO,NULL,NULL,"ptr %p size %zd line %s:%d at %s:%d\n",ptr,head->size,head->file,head->line,file,line);
+}
+
+
+#endif

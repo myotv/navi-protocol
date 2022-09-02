@@ -181,9 +181,7 @@ struct navi_received_frame_data_s *navi_peek_stream_received_frame(struct navi_s
 int navi_check_stream_received_frame(struct navi_stream_ctx_s *stream_ctx);
 int navi_count_received_frames(struct navi_stream_ctx_s *stream_ctx);
 
-#define navi_free_received_frame(frame) do { \
-  if (frame) free(frame->this_buffer); \
-} while (0)
+void navi_free_received_frame(struct navi_received_frame_data_s *frame);
 
 int navi_transport_create(struct navi_protocol_ctx_s *navi_ctx);
 int navi_transport_send_offer(struct navi_protocol_ctx_s *navi_ctx);

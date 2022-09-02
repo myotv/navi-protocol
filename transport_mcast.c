@@ -163,7 +163,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
     decrypted_data=(uint8_t*)navi_decrypt_with_mcast_secret(navi_ctx, buffer, res, &decrypted_len);
     if (!decrypted_data) return;
     if (decrypted_len<8) {
-      free((void *)decrypted_data);
+      NAVI_free((void *)decrypted_data);
       return;
     }
 
@@ -173,7 +173,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
     rx_crc=htobe16(crc16(decrypted_data, 0xFFFF, decrypted_len-sizeof(uint16_t)));
     if (*crc_ptr!=rx_crc) {
       DEBUG_FAILURE(navi_ctx, NULL, "bad mcast announce crc\n");
-      free((void *)decrypted_data);
+      NAVI_free((void *)decrypted_data);
       continue;
     }
 
@@ -201,7 +201,7 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
       }
   
       navi_ctx->events.client_event(navi_ctx, 0, domain, client_name, sdp_data, 0x00, 1, stream_count, streams, navi_ctx->events.client_event_data);
-      free(sdp_data);
+      NAVI_free(sdp_data);
     }
 
     if (navi_get_protocol_state(navi_ctx)<NAVI_STATE_DH_RECEIVED) {
@@ -218,14 +218,14 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
 
     while (streams) {
       struct navi_protocol_stream_list_s *next=streams->next;
-      free(streams);
+      NAVI_free(streams);
       streams=next;
     }
 
-    free(client_name);
-    free(domain);
+    NAVI_free(client_name);
+    NAVI_free(domain);
 
-    free((void *)decrypted_data);
+    NAVI_free((void *)decrypted_data);
   }
 }
 
@@ -243,7 +243,7 @@ void navi_send_mcast_announce(struct navi_protocol_ctx_s *navi_ctx, const uint64
 
   if (navi_ctx->mcast.group_addr.sin_addr.s_addr==0 || navi_ctx->mcast.group_addr.sin_port==0 || !navi_ctx->mcast.enable) {
     if (navi_ctx->mcast.announce_packet) {
-      free(navi_ctx->mcast.announce_packet);
+      NAVI_free(navi_ctx->mcast.announce_packet);
       navi_ctx->mcast.announce_packet=NULL;
     }
     return;
@@ -396,7 +396,7 @@ void *navi_transport_mcast_rx_thread(void *arg) {
             } else {
               DEBUG_FAILURE(navi_ctx, NULL, "Can't decrypt frame fragment header %p %d\n",decrypted_data,data_len);
             }
-            free(decrypted_data);
+            NAVI_free(decrypted_data);
           }
         }
       }
@@ -578,7 +578,7 @@ void navi_start_mcast_receive(struct navi_protocol_ctx_s *navi_ctx, const struct
 
     if (found_duplicate) continue;
     
-    struct navi_stream_ctx_s *stream=malloc(sizeof(struct navi_stream_ctx_s));
+    struct navi_stream_ctx_s *stream=NAVI_malloc(sizeof(struct navi_stream_ctx_s));
     stream->desc=sd->desc;
     stream->stream_id=sd->stream_id;
 
@@ -587,7 +587,7 @@ void navi_start_mcast_receive(struct navi_protocol_ctx_s *navi_ctx, const struct
     stream->rx_queue_head=0;
     stream->stream_api_id=0;
 
-    stream->rx_queue=malloc(sizeof(struct navi_rx_packet_s *)*stream->desc.rx_queue_length);
+    stream->rx_queue=NAVI_malloc(sizeof(struct navi_rx_packet_s *)*stream->desc.rx_queue_length);
     memset(stream->rx_queue, 0, sizeof(struct navi_rx_packet_s *)*stream->desc.rx_queue_length);
 
     stream->rx_done_queue=NULL;
@@ -756,7 +756,7 @@ void navi_send_mcast_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_t
   }
 
   res=sendto(mcast_report_send_fd, report_packet, report_packet_len, MSG_DONTWAIT|MSG_NOSIGNAL, (struct sockaddr *)&mcast_report_addr, sizeof(mcast_report_addr));
-  free(report_packet);
+  NAVI_free(report_packet);
 
   DEBUG_printf(navi_ctx,NULL,"send mcast report %d\n",res);
 
@@ -816,9 +816,10 @@ static int decode_stream_report(uint8_t *src, const int src_len, void *dst, void
   );
 
   if (res>0) {
+    const uint64_t now=navi_current_time(navi_ctx);
     for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {
       if (s->stream_id==report.stream_id) {
-        report.report_time=navi_current_time(navi_ctx);
+        report.report_time=now;
         s->mcast.remote_report=report;
         break;
       }
@@ -938,7 +939,7 @@ void navi_mcast_check_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_
     decrypted_data=(uint8_t*)navi_decrypt_with_mcast_secret(navi_ctx, buffer, res, &decrypted_len);
     if (!decrypted_data) return;
     if (decrypted_len<8) {
-      free((void *)decrypted_data);
+      NAVI_free((void *)decrypted_data);
       continue;
     }
 
@@ -948,7 +949,7 @@ void navi_mcast_check_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_
     rx_crc=htobe16(crc16(decrypted_data, 0xFFFF, decrypted_len-sizeof(uint16_t)));
     if (*crc_ptr!=rx_crc) {
       DEBUG_FAILURE(navi_ctx, NULL, "bad mcast report crc\n");
-      free((void *)decrypted_data);
+      NAVI_free((void *)decrypted_data);
       continue;
     }
 
@@ -967,10 +968,10 @@ void navi_mcast_check_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_
 
     DEBUG_printf(navi_ctx,NULL,"mcast report: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
 
-    free(client_name);
-    free(domain);
+    NAVI_free(client_name);
+    NAVI_free(domain);
 
-    free((void *)decrypted_data);
+    NAVI_free((void *)decrypted_data);
   }
 }
 

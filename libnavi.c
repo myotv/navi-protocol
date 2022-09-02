@@ -45,7 +45,7 @@ void calculate_hashes(struct navi_protocol_ctx_s *navi_ctx) {
 }
 
 struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, struct navi_events_s *events) {
-  struct navi_protocol_ctx_s *ctx=(struct navi_protocol_ctx_s*)malloc(sizeof(struct navi_protocol_ctx_s));
+  struct navi_protocol_ctx_s *ctx=(struct navi_protocol_ctx_s*)NAVI_malloc(sizeof(struct navi_protocol_ctx_s));
 
   memset(ctx, 0, sizeof(struct navi_protocol_ctx_s));
 
@@ -60,7 +60,7 @@ struct navi_protocol_ctx_s *navi_create_context(struct navi_config_s *config, st
 
   if (navi_transport_create(ctx)) {
     DEBUG_FAILURE(ctx, NULL, "Can't create transport\n");
-    free(ctx);
+    NAVI_free(ctx);
     return NULL;
   }
 
@@ -102,7 +102,7 @@ void navi_register_timesource(struct navi_protocol_ctx_s *navi_ctx, navi_timesou
 }
 
 struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_desc_s *stream_desc) {
-  struct navi_stream_ctx_s *stream=malloc(sizeof(struct navi_stream_ctx_s));
+  struct navi_stream_ctx_s *stream=NAVI_malloc(sizeof(struct navi_stream_ctx_s));
   if (stream_desc->timebase.num<1 || stream_desc->timebase.den<1) {
     NAVI_LOG(LL_NAVI_ERROR,navi_ctx,NULL,"Bad timebase for stream\n");
     return NULL;
@@ -130,7 +130,7 @@ struct navi_stream_ctx_s *navi_add_stream(struct navi_protocol_ctx_s *navi_ctx, 
     stream->desc.stream_mss=navi_ctx->mss;
   }
 
-  stream->rx_queue=malloc(sizeof(struct navi_rx_packet_s *)*stream_desc->rx_queue_length);
+  stream->rx_queue=NAVI_malloc(sizeof(struct navi_rx_packet_s *)*stream_desc->rx_queue_length);
   memset(stream->rx_queue, 0, sizeof(struct navi_rx_packet_s *)*stream_desc->rx_queue_length);
 
   stream->rx_done_queue=NULL;
@@ -461,4 +461,9 @@ void navi_library_init(void)
 #endif  
 }
 
-
+void navi_free_received_frame(struct navi_received_frame_data_s *frame) {
+  if (frame->this_buffer) {
+    NAVI_free(frame->this_buffer);
+    frame->this_buffer=NULL;
+  }
+}
