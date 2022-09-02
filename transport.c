@@ -1457,6 +1457,12 @@ void on_recv(juice_agent_t *agent, const char *data, size_t size, void *user_ptr
       NAVI_UNLOCK_CTX(navi_ctx);
       NAVI_free(ptr_to_free);
 
+      if (navi_ctx->ice_agent_state==JUICE_STATE_CONNECTING && navi_ctx->remote_start_pkey && payload_len) {
+        // HACK: set to connected
+        DEBUG_printf(navi_ctx,NULL,"Force to set ice agent state to connected\n");
+        navi_ctx->ice_agent_state=JUICE_STATE_CONNECTED;
+      }
+
       /*
       if (payload_len!=(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len)) {
         DEBUG_FAILURE(navi_ctx, NULL,"bad start payload length %d!=%ld\n",payload_len,(sizeof(struct NaviProtocolStartFrame)+navi_ctx->local_pkey_len));
