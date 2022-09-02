@@ -490,7 +490,7 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
   
   if (navi_ctx->signalling_fd<=0) return -1;
 
-  res=recv(navi_ctx->signalling_fd, buffer, sizeof(buffer), MSG_NOSIGNAL);
+  res=recv(navi_ctx->signalling_fd, buffer, sizeof(buffer), MSG_NOSIGNAL); 
   if (res<=0) return 0;
 
   if (res<(sizeof(navi_ctx->domain_hash)+sizeof(navi_ctx->client_hash)+1+2)) {
@@ -506,7 +506,7 @@ int signalling_check(struct navi_protocol_ctx_s *navi_ctx) {
     return -1;
   }
 
-//  DEBUG_printf(navi_ctx,NULL,"signalling RX\n");
+  //DEBUG_printf(navi_ctx,NULL,"signalling RX %d\n",buffer[0]&0x7f);
 //  DEBUG_hexdump(buffer, res);
  
   navi_ctx->signalling_rx_time=navi_current_time(navi_ctx);
@@ -753,6 +753,7 @@ void on_candidate(juice_agent_t *agent, const char *sdp, void *user_ptr) {
     return;
   }
 
+  DEBUG_printf(navi_ctx,NULL,"Send NS_UPDATE_CANDIDATE\n");
   signalling_send(navi_ctx, NS_UPDATE_CANDIDATE, encrypted_data, encrypted_len);
 
   NAVI_free(encrypted_data);
@@ -804,6 +805,7 @@ void on_gathering_done(juice_agent_t *agent, void *user_ptr) {
     return;
   }
 
+  DEBUG_printf(navi_ctx,NULL,"Send NS_UPDATE_CANDIDATE\n");
   signalling_send(navi_ctx, NS_UPDATE_CANDIDATE, encrypted_data, encrypted_len);
 
   NAVI_free(encrypted_data);
@@ -1695,6 +1697,7 @@ int navi_transport_send_offer(struct navi_protocol_ctx_s *navi_ctx) {
 
   if (navi_ctx->offer_data) {
     navi_ctx->offer_time=navi_current_time(navi_ctx);
+    DEBUG_printf(navi_ctx,NULL,"Send NS_UPDATE_OFFER\n");
     return signalling_send(navi_ctx, NS_UPDATE_OFFER, navi_ctx->offer_data, navi_ctx->offer_data_len);
   }
 
@@ -1740,6 +1743,7 @@ int navi_transport_send_offer(struct navi_protocol_ctx_s *navi_ctx) {
 
   navi_ctx->offer_time=navi_current_time(navi_ctx);
 
+  DEBUG_printf(navi_ctx,NULL,"Send NS_UPDATE_OFFER\n");
   return signalling_send(navi_ctx, NS_UPDATE_OFFER, navi_ctx->offer_data, navi_ctx->offer_data_len);
 }
 
@@ -1784,6 +1788,8 @@ int navi_signalling_update_state(struct navi_protocol_ctx_s *navi_ctx, const uin
     DEBUG_FAILURE(navi_ctx, NULL, "Can't encrypt state\n");
     return -1;
   }
+
+  DEBUG_printf(navi_ctx,NULL,"Send NS_UPDATE_STATE\n");
   res=signalling_send(navi_ctx, NS_UPDATE_STATE, state_data, state_data_len);
 
   NAVI_free(state_data);
@@ -1840,7 +1846,8 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
 
   juice_get_local_description(agent, answer_sdp, JUICE_MAX_SDP_STRING_LEN);
 
-  navi_ctx->client_hash=crc32(name, 0xFFFFFFFF, strlen(navi_ctx->config.client_name));
+  //navi_ctx->client_hash=crc32(name, 0xFFFFFFFF, strlen(navi_ctx->config.client_name));
+  navi_ctx->client_hash=crc32(name, 0xFFFFFFFF, strlen(name));
 
   answer_len=tlv_encode(
     navi_ctx,
@@ -1879,6 +1886,7 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
     return -1;
   }
 
+  DEBUG_printf(navi_ctx,NULL,"Send NS_UPDATE_ANSWER\n");
   res=signalling_send(navi_ctx, NS_UPDATE_ANSWER, encrypted_data, encrypted_len);
 
   NAVI_free(encrypted_data);
@@ -1972,7 +1980,7 @@ static
 int navi_transport_work_ICE(struct navi_protocol_ctx_s *navi_ctx, const uint64_t now_dt) {
   juice_agent_t *agent=navi_ctx->ice_agent;
 
-//  DEBUG_printf(navi_ctx,NULL,"navi_transport_work_ICE: ice_agent_state (start) %d\n",navi_ctx->ice_agent_state);
+  //DEBUG_printf(navi_ctx,NULL,"navi_transport_work_ICE: ice_agent_state (start) %d\n",navi_ctx->ice_agent_state);
 
   signalling_check(navi_ctx);
 

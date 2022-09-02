@@ -441,6 +441,7 @@ enum navi_loglevel_e navi_set_loglevel(enum navi_loglevel_e ll) {
     case LL_NAVI_TRACE: jl=JUICE_LOG_LEVEL_VERBOSE; break;
     default: jl=JUICE_LOG_LEVEL_NONE; break;
   }
+  DEBUG_printf_a("set juice loglevel %d\n",jl);
   juice_set_log_level(jl);
 #endif
 }
