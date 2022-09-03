@@ -1846,7 +1846,6 @@ int navi_transport_connect_client(struct navi_protocol_ctx_s *navi_ctx, const ch
 
   juice_get_local_description(agent, answer_sdp, JUICE_MAX_SDP_STRING_LEN);
 
-  //navi_ctx->client_hash=crc32(name, 0xFFFFFFFF, strlen(navi_ctx->config.client_name));
   navi_ctx->client_hash=crc32(name, 0xFFFFFFFF, strlen(name));
 
   answer_len=tlv_encode(
