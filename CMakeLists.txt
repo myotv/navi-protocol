@@ -3,6 +3,14 @@ project(navi LANGUAGES C)
 option (NAVI_WITH_MULTICAST "" OFF)
 option (NAVI_WITH_DEBUG "" OFF)
 
+if (!NAVI_WITH_MULTICAST)
+  add_compile_definitions(NAVI_WITH_MULTICAST=0)
+endif()
+
+if (!NAVI_WITH_DEBUG) 
+  add_compile_definitions(NAVI_WITH_DEBUG=0)
+endif()
+
 set(SOURCES
     encryption.c 
     libnavi.c
@@ -14,5 +22,3 @@ set(SOURCES
 )
 
 add_library(${PROJECT_NAME} ${SOURCES})
-
-target_compile_definitions(${PROJECT_NAME} PRIVATE NAVI_WITH_MULTICAST=${NAVI_WITH_MULTICAST} NAVI_WITH_DEBUG=${NAVI_WITH_DEBUG})
