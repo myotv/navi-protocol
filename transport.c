@@ -2557,7 +2557,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
           }
           if (send_via_unicast) {
             if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, data, subframe_len+sizeof(struct NaviProtocolDataFrameHeader))<0) {
-              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame\n");
+              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame, error: %s\n",strerror(errno));
               res_ucast=-1;
             } else {
               net_send_bytes+=subframe_len+sizeof(struct NaviProtocolDataFrameHeader)+sizeof(struct NaviProtocolFrameHeader);
@@ -2596,7 +2596,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
               }
             }
             if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, encrypted_data, subframe_len+encrypted_len)<0) {
-              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame\n");
+              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame, error: %s\n",strerror(errno));
               return -1;
             } else {
               net_send_bytes+=subframe_len+encrypted_len+sizeof(struct NaviProtocolDataFrameHeader)+sizeof(struct NaviProtocolFrameHeader);
@@ -2652,7 +2652,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
               }
             }
             if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, encrypted_data, encrypted_len)<0) {
-              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame\n");
+              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame, error: %s\n",strerror(errno));
               return -1;
             } else {
               net_send_bytes+=encrypted_len+sizeof(struct NaviProtocolDataFrameHeader)+sizeof(struct NaviProtocolFrameHeader);
@@ -2697,7 +2697,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
         switch (frame_encryption) {
           case NAVI_ENCRYPT_NONE:
             if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, fec_head, navi_ctx->mss)<0) {
-              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send fec frame\n");
+              DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send fec frame, error %s\n",strerror(errno));
               return -1;
             } else {
               net_send_bytes+=navi_ctx->mss+sizeof(struct NaviProtocolFrameHeader);
@@ -2714,7 +2714,7 @@ int navi_send_packet(struct navi_stream_ctx_s *stream_ctx, const int64_t pts, co
               }
 
               if (navi_send_frame(navi_ctx, NAVICMD_DATA, stream_ctx->stream_id, encrypted_data, encrypted_len)<0) {
-                DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame\n");
+                DEBUG_FAILURE(navi_ctx,stream_ctx, "Can't send data frame, error: %s\n",strerror(errno));
                 return -1;
               } else {
                 net_send_bytes+=encrypted_len+sizeof(struct NaviProtocolFrameHeader);
