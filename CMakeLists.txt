@@ -3,7 +3,8 @@ project(navi LANGUAGES C)
 option (NAVI_WITH_MULTICAST "" OFF)
 option (NAVI_WITH_DEBUG "" OFF)
 
-set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -MMD -O3 -funsigned-char -g -std=c11 -D_FILE_OFFSET_BITS=64 -Werror -D_GNU_SOURCE -fvisibility=hidden")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -MMD -funsigned-char -g -std=c11 -D_FILE_OFFSET_BITS=64 -Werror -D_GNU_SOURCE -fvisibility=hidden")
+set(CMAKE_C_FLAGS_RELEAE "${CMAKE_CXX_FLAGS} -MMD -O3 -funsigned-char -g -std=c11 -D_FILE_OFFSET_BITS=64 -Werror -D_GNU_SOURCE -fvisibility=hidden")
 
 if (!NAVI_WITH_MULTICAST)
   add_compile_definitions(NAVI_WITH_MULTICAST=0)
