@@ -192,7 +192,9 @@ void navi_check_mcast_discovery(struct navi_protocol_ctx_s *navi_ctx, const uint
       TLV_END
     );
 
-    DEBUG_printf(navi_ctx,NULL,"mcast announce: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
+    if (!navi_ctx->mcast.mcast_socket) {
+      DEBUG_printf(navi_ctx,NULL,"mcast announce: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
+    }
     if (navi_ctx->events.client_event) {
       char *sdp_data;
       char *udp_addr=inet_ntoa(group_addr);
@@ -315,7 +317,7 @@ void navi_send_mcast_announce(struct navi_protocol_ctx_s *navi_ctx, const uint64
 
   res=sendto(mcast_discovery_fd, navi_ctx->mcast.announce_packet, navi_ctx->mcast.announce_packet_len, MSG_DONTWAIT|MSG_NOSIGNAL, (struct sockaddr *)&mcast_announce_addr, sizeof(mcast_announce_addr));
 
-  DEBUG_printf(navi_ctx,NULL,"send mcast discovery %d\n",res);
+  DEBUG_printf(navi_ctx,NULL,"send mcast discovery %d name '%s'\n",res,navi_ctx->config.client_name);
 
   if (res<0) {
     DEBUG_FAILURE(navi_ctx, NULL, "can't send mcast announce, error %s\n",strerror(errno));
