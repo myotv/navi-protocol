@@ -671,7 +671,7 @@ int navi_start_mcast_report_sending(void) {
   }
 
   mcast_report_addr.sin_family=AF_INET;
-  mcast_report_addr.sin_port=0; //htons(NAVI_MULTICAST_REPORT_PORT);
+  mcast_report_addr.sin_port=0;
   mcast_report_addr.sin_addr.s_addr=inet_addr(report_group_addr);
 
   if (bind(mcast_report_send_fd, (struct sockaddr *)&mcast_report_addr, sizeof(mcast_report_addr))<0) {
@@ -680,6 +680,8 @@ int navi_start_mcast_report_sending(void) {
     mcast_report_send_fd=0;
     return -1;
   }
+
+  mcast_report_addr.sin_port=htons(NAVI_MULTICAST_REPORT_PORT);
 
   mreq.imr_multiaddr=mcast_report_addr.sin_addr;
   mreq.imr_address.s_addr=htonl(INADDR_ANY);

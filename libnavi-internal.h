@@ -103,6 +103,7 @@ struct navi_protocol_ctx_s {
   uint32_t client_hash;
   int signalling_fd;
   pthread_spinlock_t lock;
+  int lock_line;
   enum navi_protocol_state_e state;
   uint32_t candidate_list_version;
   void *offer_data;
@@ -183,8 +184,8 @@ struct navi_protocol_ctx_s {
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define NAVI_LOCK_CTX(_ctx) do { pthread_spin_lock(&_ctx->lock); } while (0)
-#define NAVI_UNLOCK_CTX(_ctx) do { pthread_spin_unlock(&_ctx->lock); } while (0)
+#define NAVI_LOCK_CTX(_ctx) do { pthread_spin_lock(&_ctx->lock); _ctx->lock_line=__LINE__; } while (0)
+#define NAVI_UNLOCK_CTX(_ctx) do { _ctx->lock_line=0; pthread_spin_unlock(&_ctx->lock); } while (0)
 
 static inline
 enum navi_protocol_state_e navi_get_protocol_state(struct navi_protocol_ctx_s *navi_ctx) {
