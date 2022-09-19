@@ -478,6 +478,7 @@ int navi_transport_start_multicast_on_addr(struct navi_protocol_ctx_s *navi_ctx,
 
   if (for_tx) {
     navi_ctx->mcast.group_addr.sin_addr.s_addr=0;
+    navi_ctx->mcast.group_addr.sin_port=0;
   } else {
     if (!group_addr) {
       navi_ctx->mcast.group_addr.sin_addr.s_addr=inet_addr(addr_str);
