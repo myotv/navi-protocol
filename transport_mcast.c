@@ -671,7 +671,7 @@ int navi_start_mcast_report_sending(void) {
   }
 
   mcast_report_addr.sin_family=AF_INET;
-  mcast_report_addr.sin_port=htons(NAVI_MULTICAST_REPORT_PORT);
+  mcast_report_addr.sin_port=0; //htons(NAVI_MULTICAST_REPORT_PORT);
   mcast_report_addr.sin_addr.s_addr=inet_addr(report_group_addr);
 
   if (bind(mcast_report_send_fd, (struct sockaddr *)&mcast_report_addr, sizeof(mcast_report_addr))<0) {
@@ -969,7 +969,7 @@ void navi_mcast_check_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_
       TLV_END
     );
 
-    DEBUG_printf(navi_ctx,NULL,"mcast report: res %ld name %s domain %s streams %d\n",res,client_name,domain,stream_count);
+    DEBUG_printf(navi_ctx,NULL,"mcast report: pid %d res %ld %s:%d name %s domain %s streams %d\n",getpid(),res,inet_ntoa(pkt_addr.sin_addr),ntohs(pkt_addr.sin_port),client_name,domain,stream_count);
 
     NAVI_free(client_name);
     NAVI_free(domain);
