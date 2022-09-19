@@ -2405,7 +2405,7 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
 
 int navi_transport_multicast_ready(struct navi_protocol_ctx_s *navi_ctx) {
 #if NAVI_WITH_MULTICAST==1  
-  return navi_mcast_available(navi_ctx) && navi_ctx->mcast.rx_active>0;
+  return navi_mcast_available(navi_ctx) && (navi_ctx->mcast.rx_active>0 || navi_mcast_can_send_stream(navi_ctx, NULL));
 #else
   return 0;
 #endif

@@ -982,6 +982,9 @@ void navi_mcast_check_report(struct navi_protocol_ctx_s *navi_ctx, const uint64_
 
 static 
 bool navi_mcast_can_send_stream(struct navi_protocol_ctx_s *navi_ctx, struct navi_stream_ctx_s *stream_ctx) {
+  if (!stream_ctx) stream_ctx=navi_ctx->tx_streams;
+  if (!stream_ctx) return false;
+
   if (!navi_ctx->mcast.ondemand_enable) return true;
   return !stream_ctx->mcast.report_rx_timeout;
 }
