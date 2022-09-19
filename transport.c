@@ -1238,7 +1238,7 @@ void proced_rx_fragment(struct navi_protocol_ctx_s *navi_ctx, struct NaviProtoco
   fragment_idx=be16toh(fragment_head->frame_idx);
 
   DEBUG_printf(navi_ctx,stream_ctx,
-    "%p %p -- rx to stream %p %s id %u %08x frame idx %d/%d size %d frag size %d flags %x head %u\n",
+    "-- rx to stream %p %s id %u %08x frame idx %d/%d size %d frag size %d flags %x head %u\n",
     stream_ctx,
     stream_ctx->desc.description,
     rx_packet_id,
