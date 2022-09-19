@@ -2348,7 +2348,8 @@ int navi_transport_work(struct navi_protocol_ctx_s *navi_ctx) {
         if (navi_ctx->mcast.ondemand_enable) {
           for (struct navi_stream_ctx_s *s=navi_ctx->tx_streams; s; s=s->next) {
             const bool old_value=s->mcast.report_rx_timeout;
-            s->mcast.report_rx_timeout=(now_dt-s->mcast.remote_report.report_time)>(NAVI_MCAST_REPORT_PERIOD*2);
+            if (now_dt<s->mcast.remote_report.report_time) continue;
+            s->mcast.report_rx_timeout=(now_dt-s->mcast.remote_report.report_time)>(NAVI_MCAST_REPORT_PERIOD*4);
             if (old_value!=s->mcast.report_rx_timeout) {
               NAVI_LOG(LL_NAVI_INFO, navi_ctx, s, "report_rx_timeout changed from %d to %d\n",old_value,s->mcast.report_rx_timeout);
             }
