@@ -447,7 +447,7 @@ int navi_transport_start_multicast_on_addr(struct navi_protocol_ctx_s *navi_ctx,
 
   static const int no=0;
   static const int yes=1;
-  if (setsockopt(navi_ctx->mcast.mcast_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(no))<0) {
+  if (setsockopt(navi_ctx->mcast.mcast_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))<0) {
     DEBUG_FAILURE_A("Can't unset SO_REUSEADDR, error %s",strerror(errno));
     close(navi_ctx->mcast.mcast_socket);
     navi_ctx->mcast.mcast_socket=0;
