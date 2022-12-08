@@ -107,6 +107,9 @@ int encode_strz(va_list* ap, uint8_t *dst, void *user_ctx);
 int decode_strz(uint8_t *src, const int src_len, void *dst, void *user_ctx);
 int decode_strz_arr(uint8_t *src, const int src_len, void *dst, const int idx, void *user_ctx);
 
+int encode_u81632(va_list* ap, uint8_t *dst, void *user_ctx);
+int decode_u81632(uint8_t *src, const int src_len, void *dst, void *user_ctx);
+
 int encode_u8(va_list* ap, uint8_t *dst, void *user_ctx);
 int encode_u8_arr(void *ptr, const int idx, uint8_t *dst, void *user_ctx);
 int decode_u8(uint8_t *src, const int src_len, void *dst, void *user_ctx);

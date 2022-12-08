@@ -279,6 +279,34 @@ int decode_u16_array(uint8_t *src, const int src_len, void *dst, const int idx, 
   return sizeof(uint16_t);
 }
 
+int encode_u81632(va_list* ap, uint8_t *dst, void *user_ctx) {
+  unsigned int value=va_arg(*ap, unsigned int);
+  if (value<0x100) {
+    if (dst) *((uint8_t*)dst)=value;
+    return sizeof(uint8_t); 
+  }
+  if (value>0xFFFF) {
+    if (dst) *((uint32_t*)dst)=htobe32(value);
+    return sizeof(uint32_t); 
+  }
+  if (dst) *((uint16_t*)dst)=htobe16(value);
+  return sizeof(uint16_t); 
+}
+
+int decode_u81632(uint8_t *src, const int src_len, void *dst, void *user_ctx) {
+  if (src_len==sizeof(uint8_t)) {
+    if (dst) *((uint8_t*)dst)=*(uint8_t *)src;
+    return sizeof(uint8_t);
+  }
+  if (src_len==sizeof(uint32_t)) {
+    if (dst) *((uint32_t*)dst)=be32toh(*(uint32_t *)src);
+    return sizeof(uint32_t);
+  }
+  if (src_len!=sizeof(uint16_t)) return -1; 
+  if (dst) *((uint16_t*)dst)=be16toh(*(uint16_t *)src);
+  return sizeof(uint16_t);
+}
+
 int encode_u32(va_list* ap, uint8_t *dst, void *user_ctx) {
   uint32_t value=va_arg(*ap, uint32_t);
   if (dst) *((uint32_t*)dst)=htobe32(value);
