@@ -464,7 +464,8 @@ void navi_library_init(void)
 
 void navi_free_received_frame(struct navi_received_frame_data_s *frame) {
   if (frame->this_buffer) {
-    NAVI_free(frame->this_buffer);
+    void *ptr=frame->this_buffer;
     frame->this_buffer=NULL;
+    NAVI_free(ptr);
   }
 }

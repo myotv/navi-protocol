@@ -1150,8 +1150,20 @@ bool proced_rx_queue_packet(struct navi_protocol_ctx_s *navi_ctx, struct navi_st
         }
         stream_ctx->last_rx_id=rx_packet->packet_id;
 
-        if (navi_ctx->events.rx_data_event) {
-          navi_ctx->events.rx_data_event(navi_ctx, stream_ctx, rx_frame->data.pts, rx_frame->data.dts, rx_frame->data.flags, navi_ctx->events.rx_data_event_data);
+        // check that received frame is not removed from RX queue
+        pthread_mutex_lock(&stream_ctx->rx_mtx);
+        struct navi_received_frame_s *qframe=stream_ctx->rx_done_queue;
+        pthread_mutex_unlock(&stream_ctx->rx_mtx);
+
+        if (navi_ctx->events.rx_data_event && qframe==rx_frame) {
+          navi_ctx->events.rx_data_event(
+            navi_ctx, 
+            stream_ctx, 
+            rx_frame->data.pts, 
+            rx_frame->data.dts, 
+            rx_frame->data.flags, 
+            navi_ctx->events.rx_data_event_data
+          );
         }
       } else {
         DEBUG_printf(navi_ctx,stream_ctx,"decrypt error in proced_rx_queue_packet\n");
